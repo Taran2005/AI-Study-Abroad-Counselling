@@ -1,6 +1,6 @@
 # Project Implementation Phases
 
-This document tracks the different phases of the project, including past feature additions, the current state, and future steps for maintaining and evolving the Luna AI Voice Agent.
+This document tracks the different phases of the project, including past feature additions, the current state, and future steps for maintaining and evolving the StudyBuddyAI AI Voice Agent.
 
 ## Phase 1: Core Architecture (Completed)
 - Integrated Deepgram Nova-3 for quick and accurate real-time STT.
@@ -9,54 +9,63 @@ This document tracks the different phases of the project, including past feature
 
 ## Phase 2: User Interface & Video (Completed)
 - Designed a cohesive web UI mapping STT transcripts and LLM responses into a unified timeline.
-- Integrated the Anam Avatar plugin (`livekit-plugins-anam`) to present a lifelike video representation of Luna.
+- Integrated the Anam Avatar plugin (`livekit-plugins-anam`) to present a lifelike video representation.
 - Added camera and screen-sharing controls on the frontend.
 - Implemented real-time vision frame processing in `agent.py`, allowing GPT-4o to "see" User Camera and Screen Share tracks.
 
-## Phase 3: Expressive Speech Integration (Current)
-- **Goal:** Enhance the TTS delivery with lifelike emotion and non-speech sounds (laughs, sighs).
-- **Execution:**
-  1. Swapped Cartesia Cloud Inference for a local `livekit-plugins-elevenlabs` integration.
-  2. Changed TTS engine to `elevenlabs.TTS(model="eleven_multilingual_v2")`.
-  3. Updated the OpenAI system prompt instructions to dynamically inject ElevenLabs Audio Tags (e.g., `[laughs]`, `[sighs]`) directly into the dialogue to trigger specific sound effects in the audio stream.
+## Phase 3: Expressive Speech Integration (Completed)
+- Swapped Cartesia Cloud Inference for a local `livekit-plugins-elevenlabs` integration.
+- Changed TTS engine to `elevenlabs.TTS(model="eleven_multilingual_v2")`.
+- Updated the OpenAI system prompt instructions to dynamically inject ElevenLabs Audio Tags.
+
+## Phase 4: StudyBuddyAI Rebrand (Current - In Progress)
+- **Goal:** Transform Luna AI (ReeLabs stem cell company) into StudyBuddyAI (overseas education counsellor).
+- **Completed:**
+  1. Updated `package.json` name from `luna-ai` to `studybuddyai`.
+  2. Rebranded `navbar.tsx` with StudyBuddyAI logo (GraduationCap icon) and education-focused nav links.
+  3. Rewrote `hero-section.tsx` with education stats (45K+ students, 120+ universities, UK & Ireland).
+  4. Updated `agent/page.tsx` connect screen with StudyBuddyAI branding.
+  5. Changed API route to dispatch `studybuddyai-agent` instead of `luna-agent`.
+  6. Updated agent registration from `luna-agent` to `studybuddyai-agent`.
+  7. Updated `layout.tsx` metadata for SEO (title, description, keywords).
 - **Pending Tasks:**
-  - Provide API keys in local development environment.
-  - Final test to verify lip-syncing aligns with the Audio Tags and non-speech sounds.
+  - Replace `knowledge_base.txt` with UK/Ireland education content.
+  - Rewrite agent persona from Luna/ReeLabs to StudyBuddyAI counsellor.
+  - Update email templates for StudyBuddyAI branding.
 
-## Phase 4: Knowledge Base Integration (Current)
-- **Goal:** Transform Luna from a generic assistant into a ReeLabs domain expert.
-- **Approach:** System Prompt Injection (chosen over RAG for zero latency in voice pipeline).
-- **Execution:**
-  1. Scraped 12+ pages from `reelabs.com` (About, Banking, Therapy, Anti-Ageing, Treatable Diseases, etc.).
-  2. Condensed all content into `agent/knowledge_base.txt` — a structured document optimized for LLM consumption.
-  3. Updated `agent.py` to load `knowledge_base.txt` at startup via `pathlib` and inject it into the system prompt.
-  4. Rewrote Luna's persona from "generic AI assistant" to "ReeLabs virtual stem cell consultant."
-- **Knowledge Base covers:**
-  - Company overview and stats (13 patents, 10 sources, 99% cell recovery rate)
-  - All 10 stem cell banking sources with detailed explanations
-  - Stem cell therapy for 80+ conditions
-  - Golden Vial Anti-Ageing program (protocol, results, FAQs, testimonials)
-  - Osteoarthritis treatment and Toticyte product
-  - Contact information and service links
+## Phase 5: Data Extraction & Lead Scoring (Upcoming)
+- **Goal:** Extract 12+ data points from student conversations and calculate lead scores.
+- **Data Points to Extract:**
+  - Personal: Name, phone, email, location
+  - Academic: Education level, field, institution, GPA
+  - Preferences: Target countries, course interest, intake timing
+  - Test Status: IELTS/TOEFL score or preparation stage
+  - Financial: Budget range, scholarship interest
+  - Timeline: Application deadline
+- **Lead Scoring Algorithm:**
+  - Intent Seriousness (40%): Goals clarity, research level
+  - Financial Readiness (30%): Budget alignment, funding awareness
+  - Timeline Urgency (30%): Application deadlines, test prep status
+  - Classifications: Hot (70-100), Warm (40-69), Cold (0-39)
 
-## Phase 5: Multilingual Code-Switching (Current)
-- **Goal:** Allow the agent to mirror "Hinglish" seamlessly naturally switching between Hindi and English words.
-- **Execution:**
-  1. Updated `stt` to use an explicit deepgram.STT object with `language="hi"`. Deepgram's Hindi model natively parses thick Indian accents and English loan words efficiently.
-  2. Injected a rule into Luna's system prompt instructions: "You must perfectly mirror the user's language and speaking style." If they speak Hinglish, reply in Hinglish.
-  3. Changed the `tts` engine from standard Cartesia to `cartesia.TTS(model="sonic-multilingual")` so it correctly pronounces Devanagari script and English interchangeably without mangling phonetic sounds.
+## Phase 6: Report Generation & UI (Upcoming)
+- **Goal:** Generate structured JSON reports and display them in the UI.
+- **Report Contents:**
+  - Full conversation transcript
+  - Extracted student data (JSON)
+  - Lead score with breakdown
+  - Recommended next actions
+- **UI Components:**
+  - Post-call summary screen
+  - Real-time data extraction status during call
+  - Counsellor notes section
 
-## Phase 6: Scheduler & Transcription UI Fix (Current)
-- **Goal**: Allow users to verbally book a consultation while receiving real-time transcript updates in the frontend.
-- **Frontend Fix (`page.tsx`)**: Removed the `lk.transcription_final` filter loop, allowing interim LLM voice generation blobs to render progressively. 
-- **Backend Feature (`agent.py`)**: 
-  - Subclassed `llm.FunctionContext` to create the `@llm.ai_callable` `book_consultation` tool.
-  - LLM now automatically extracts `user_name`, `user_email`, `date`, and `time` during conversation.
-  - Implemented `smtplib` inside the function call to instantly send a cleanly formatted HTML confirmation email using environment credentials (`SENDER_EMAIL` & `SENDER_PASSWORD`).
+## Phase 7: Multilingual Support Enhancement (Upcoming)
+- Add Marathi language support to STT/TTS.
+- Verify Hindi/English code-switching works correctly.
+- Test with thick Indian accents.
 
-## Future Phases
-- Build "Scan Medical File" UI button for the vision pipeline showcase.
-- Implement Function Calling for lead capture (book_consultation tool).
-- Add explicit multilingual language-switch UI indicator.
-- Address any remaining lint errors or minor connection edge-cases.
-- Test and establish mobile responsiveness for the live session UI.
+## Phase 8: Bonus Features (Future)
+- **Tier 1:** Sentiment detection, smart follow-ups, multi-turn memory
+- **Tier 2:** University recommendations, WhatsApp integration, live dashboard
+- **Tier 3:** Appointment booking with calendar integration, call analytics dashboard

@@ -38,7 +38,7 @@ export default function AgentPage() {
 	const handleConnect = useCallback(async () => {
 		setIsConnecting(true);
 		try {
-			const roomName = `luna-room-${Date.now()}`;
+			const roomName = `studybuddyai-room-${Date.now()}`;
 			const participantName = `user-${Math.random().toString(36).substring(2, 8)}`;
 
 			const response = await fetch("/api/token", {
@@ -118,11 +118,11 @@ function ConnectScreen({
 					<Phone className="h-8 w-8 text-primary" />
 				</div>
 				<h1 className="text-3xl font-semibold tracking-tight text-foreground">
-					Luna AI
+					StudyBuddyAI
 				</h1>
 				<p className="text-muted-foreground max-w-sm">
-					Start a voice conversation with Luna, your AI assistant with a
-					lifelike avatar.
+					Start a voice conversation with your AI study abroad counsellor.
+					Ask about UK &amp; Ireland universities, admissions, and visa process.
 				</p>
 			</div>
 			<Button
@@ -453,7 +453,7 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 									}`}
 								>
 									<span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-										{msg.isUser ? "You" : "Luna"}
+										{msg.isUser ? "You" : "StudyBuddyAI"}
 									</span>
 									<div
 										className={`rounded-xl px-3 py-2 max-w-[85%] text-sm ${

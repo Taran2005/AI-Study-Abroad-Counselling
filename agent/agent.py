@@ -1,10 +1,10 @@
 """
-Luna AI Voice Agent with Anam Avatar
-=====================================
-A LiveKit voice agent using:
+StudyBuddyAI AI Voice Agent with Anam Avatar
+=========================================
+A LiveKit voice agent for overseas education counselling using:
 - STT: Deepgram Nova-3 (via LiveKit Inference)
 - LLM: OpenAI GPT-4o (via OpenAI plugin - Responses API)
-- TTS: Cartesia Sonic-3 (via LiveKit Inference)
+- TTS: ElevenLabs Multilingual v2 (via LiveKit Inference)
 - Avatar: Anam (lifelike avatar video)
 - Vision: Video frame sampling from user's camera/screen share
 """
@@ -38,7 +38,7 @@ from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 load_dotenv(".env.local")
 
-logger = logging.getLogger("luna-agent")
+logger = logging.getLogger("studybuddyai-agent")
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler("vision_debug.log", mode="w")
 fh.setLevel(logging.DEBUG)
@@ -296,8 +296,8 @@ async def vision_text_input_cb(
     session.generate_reply(user_input=user_msg)
 
 
-@server.rtc_session(agent_name="luna-agent")
-async def luna_agent(ctx: agents.JobContext):
+@server.rtc_session(agent_name="studybuddyai-agent")
+async def studybuddyai_agent(ctx: agents.JobContext):
     """Entry point for the Luna voice agent session."""
     global _agent_instance
 

@@ -15,16 +15,18 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ReeLabs — AI-Powered Stem Cell Banking & Therapy",
+  title: "StudyBuddyAI — AI-Powered Study Abroad Counsellor",
   description:
-    "Meet Luna, India's first AI voice consultant for stem cell banking, therapy, and the Golden Vial Anti-Ageing program. Trusted by 10,000+ families.",
+    "Your personal AI counsellor for UK & Ireland universities. Get instant guidance on admissions, scholarships, IELTS/PTE, and visa process. Trusted by 45,000+ students.",
   keywords: [
-    "stem cell banking",
-    "stem cell therapy",
-    "ReeLabs",
-    "Luna AI",
-    "anti-ageing",
-    "Golden Vial",
+    "study abroad",
+    "UK universities",
+    "Ireland education",
+    "StudyBuddyAI",
+    "AI counsellor",
+    "IELTS preparation",
+    "student visa",
+    "overseas education",
   ],
 };
 

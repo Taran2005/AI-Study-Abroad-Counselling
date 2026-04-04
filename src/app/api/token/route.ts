@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
  * POST /api/token
  *
  * Generates a LiveKit access token for the client and dispatches
- * the Luna agent into the room.
+ * the StudyBuddyAI agent into the room.
  */
 export async function POST(request: Request) {
 	try {
@@ -45,9 +45,9 @@ export async function POST(request: Request) {
 
 		const jwt = await token.toJwt();
 
-		// Dispatch the Luna agent into the room
+		// Dispatch the StudyBuddyAI agent into the room
 		const dispatchClient = new AgentDispatchClient(livekitUrl, apiKey, apiSecret);
-		await dispatchClient.createDispatch(roomName, "luna-agent");
+		await dispatchClient.createDispatch(roomName, "studybuddyai-agent");
 
 		return NextResponse.json({ token: jwt });
 	} catch (error) {
