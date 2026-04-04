@@ -619,8 +619,8 @@ async def studybuddyai_agent(ctx: agents.JobContext):
         )
         agent_tts = google.TTS(
             language="en-US",
-            voice_name="Aoede",
-            model_name="gemini-2.5-flash-tts",
+            voice_name="en-US-Chirp3-HD-Charon",
+            model_name="chirp_3",
             credentials_info=_google_creds,
         )
     else:
