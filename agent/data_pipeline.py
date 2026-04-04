@@ -7,6 +7,7 @@ Handles all data operations between the Python agent and the Next.js API:
   - Background data extraction (12+ student data points)
   - Post-call lead scoring (Intent 40% + Financial 30% + Timeline 30%)
   - Sentiment analysis (Excited / Anxious / Confused / Neutral)
+  - WhatsApp summary dispatch (Twilio)
 
 All communication goes through the Next.js API routes which handle Supabase
 writes using the SERVICE_ROLE_KEY, so this module only needs the API base URL.
@@ -21,6 +22,7 @@ from typing import Optional
 
 import httpx
 from openai import AsyncOpenAI
+from twilio_client import send_whatsapp_summary
 
 logger = logging.getLogger("studybuddyai-pipeline")
 
@@ -430,6 +432,7 @@ async def run_post_call_pipeline(
     3. Analyze sentiment
     4. Save everything to the database
     5. Create student profile
+    6. Send WhatsApp summary (if phone available and lead is warm/hot)
     """
     logger.info(f"Starting post-call pipeline for conversation {conversation_id}")
 
@@ -472,6 +475,32 @@ async def run_post_call_pipeline(
     # 3. Create student profile if we extracted enough data
     if extracted_data:
         await create_student_profile(extracted_data)
+
+    # 4. Send WhatsApp summary to the student (warm/hot leads with phone number)
+    total_score = (
+        score_result["intent_score"] * 0.4
+        + score_result["financial_score"] * 0.3
+        + score_result["timeline_score"] * 0.3
+    )
+    student_phone = extracted_data.get("phone")
+    student_name = extracted_data.get("name", "")
+
+    if student_phone and total_score >= 40:
+        try:
+            await asyncio.to_thread(
+                send_whatsapp_summary,
+                student_phone,
+                student_name,
+                extracted_data,
+                score_result,
+                conversation_id,
+            )
+        except Exception as e:
+            logger.error(f"WhatsApp dispatch failed (non-blocking): {e}")
+    elif student_phone:
+        logger.info(f"Skipping WhatsApp — lead score {total_score:.0f} is below threshold (40)")
+    else:
+        logger.info("Skipping WhatsApp — no phone number extracted")
 
     logger.info(
         f"Post-call pipeline complete for {conversation_id}. "
