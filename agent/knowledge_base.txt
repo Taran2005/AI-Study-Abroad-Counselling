@@ -1,161 +1,252 @@
-===== REELABS KNOWLEDGE BASE =====
-Use the following information to answer questions about ReeLabs accurately and confidently.
-You represent ReeLabs. Never say "I don't know" about ReeLabs services — use the data below.
+===== STUDYBUDDYAI KNOWLEDGE BASE =====
+Use the following information to answer student queries about studying abroad accurately and confidently.
+You represent StudyBuddyAI — a trusted overseas education consultancy. Never say "I don't know" about programs or processes — use the data below to give helpful, actionable guidance.
 
 --- COMPANY OVERVIEW ---
-ReeLabs Private Limited is India's first integrated stem cell company.
-They are a recognised authority in stem cell banking, therapy, and research.
-ReeLabs is a part of the Indian Society of Regenerative Science (ISRS).
-Their scientists are invited as keynote speakers at international conferences.
-They have helped over 1,00,000 (one lakh) people across India.
-They have tie-ups with over 300 hospitals, medical centres, and specialty clinics across India.
-Toll Free Number: 1800-222-454 (Mon-Fri, 10am-6pm).
-Website: www.reelabs.com
+StudyBuddyAI is an AI-powered overseas education consultancy specialising in UK and Ireland university placements.
+We have helped over 45,000 students successfully gain admission to top universities.
+Our network includes 120+ partner universities across the UK and Ireland.
+StudyBuddyAI provides end-to-end support: from course selection and university matching to visa guidance and pre-departure orientation.
+Website: www.studybuddyai.ai
 
---- KEY STATS ---
-13 International Patents
-7 Completed Clinical Trials (3 ongoing)
-20 Proprietary Inventions/Technologies
-300+ International Publications
-10 Sources of Stem Cell Banking
-99% Cell Recovery Rate (industry-leading)
-25% more cells saved on average compared to other methods
-Asia's largest state-of-the-art stem cell laboratory (located in Mumbai)
-Awarded India's Best Enterprise for Innovation in Stem Cells by Navabharat Times (Sept 2023), presented by Union Health Minister Dr. Bharti Pawar.
+--- UK UNIVERSITIES (TOP PICKS) ---
 
---- STEM CELL BANKING (10 SOURCES) ---
-ReeLabs banks stem cells from up to 10 different sources:
-1. Cord Blood (Hematopoietic Stem Cells - HSCs: blood and immune system therapies)
-2. Cord Tissue (Mesenchymal Stem Cells - MSCs: tissue repair and regeneration)
-3. Placenta/Chorion (MSCs: richest source, significant promise in regenerative medicine)
-4. Amniotic Sac (only ReeLabs in India can bank from this source)
-5. Amniotic Fluid (only ReeLabs in India can bank from this source)
-6. Dental Pulp (from milk teeth — can be banked even after birth window is missed)
-7. Bone Marrow
-8. Adipose Tissue (fat)
-9. Menstrual Fluid/Blood
-10. Peripheral Blood/Bloodstream
+1. University of Oxford
+   - Location: Oxford, England
+   - Key Courses: PPE, Medicine, Computer Science, Law, Engineering
+   - Entry Requirements: AAA at A-Level or equivalent, IELTS 7.0–7.5
+   - Approx. Fees: £28,000–£44,000/year
+   - Scholarship: Clarendon Scholarships, Rhodes Scholarships
 
-IMPORTANT: ReeLabs is the ONLY stem cell bank in India approved to collect and store from Placenta, Amniotic Sac, and Amniotic Fluid. These are the richest sources in terms of both quantity and quality of stem cells.
+2. University of Cambridge
+   - Location: Cambridge, England
+   - Key Courses: Natural Sciences, Engineering, Mathematics, Economics, Law
+   - Entry Requirements: A*AA at A-Level, IELTS 7.0–7.5
+   - Approx. Fees: £24,000–£63,000/year
+   - Scholarship: Gates Cambridge, Cambridge Trust
 
-Sources 1-5 (Cord Blood, Cord Tissue, Placenta, Amniotic Sac, Amniotic Fluid) can ONLY be collected during childbirth.
-Dental Pulp can be collected later when the child loses milk teeth.
-Bone Marrow, Adipose, Menstrual, and Peripheral Blood can be collected at any time.
+3. Imperial College London
+   - Location: London, England
+   - Key Courses: Engineering, Computer Science, Medicine, Business
+   - Entry Requirements: AAA at A-Level, IELTS 6.5–7.0
+   - Approx. Fees: £35,000–£50,000/year
+   - Scholarship: President's Scholarships
 
---- WHY PARENTS CHOOSE REELABS ---
-- Only company in India banking from 10 sources
-- Only company in India approved for Placental, Amniotic Sac, and Amniotic Fluid banking
-- Asia's largest state-of-the-art stem cell facility in Mumbai
-- Banking AND therapy under one roof (unique in India)
-- 13 international patents and 20 proprietary technologies
-- 99% cell recovery rate
-- Processes samples within first 6 hours of collection (Mumbai patients), ensuring unbeatable count, viability, and potency
-- GLP (Good Laboratory Practices) and GMP (Good Manufacturing Practices) accredited
-- Option for HLA-matching during retrieval for transplant (exclusive service)
-- Option for stem cell amplification and expansion in rare cases of inadequate collection
-- Distinguished panel of doctors, scientists, and lab personnel working round the clock
-- Celebrities and well-known parents trust ReeLabs (testimonials include: Hiral Thanawala, Jyotsna Patil, Mehul Nisar, Aarti Kalera, Mansi Goel, Rohini Vakil Kapoor)
+4. University College London (UCL)
+   - Location: London, England
+   - Key Courses: Architecture, Law, Medicine, Arts & Sciences
+   - Entry Requirements: AAA–ABB at A-Level, IELTS 6.5–7.5
+   - Approx. Fees: £23,000–£38,000/year
 
---- STEM CELL THERAPY ---
-Stem Cell Therapy (SCT) treats various disorders using stem cells.
-Can treat over 80 approved disorders including:
-- Leukaemia
-- Thalassemia
-- Aplastic Anaemia
-- Sickle Cell Anaemia
-- Osteoarthritis
-- Cerebral Palsy
-- Muscular Dystrophy
-- Spinal Cord Injuries
-- Multiple Sclerosis
-- Stroke
-- Congestive Cardiac Failure
-- Liver Cirrhosis
-- Chronic Renal Failure
-- Diabetes
-- Parkinson's Disease
-- Alzheimer's Disease
-- Heart Disease
-- Autoimmune Diseases
+5. University of Edinburgh
+   - Location: Edinburgh, Scotland
+   - Key Courses: Medicine, Data Science, Informatics, Veterinary Science
+   - Entry Requirements: AAA at A-Level, IELTS 6.5–7.0
+   - Approx. Fees: £22,000–£35,000/year
 
-ReeLabs uses proprietary technology to process stem cells ensuring they are completely safe, non-toxic, and devoid of side effects with excellent probability of homing and engraftment.
+6. University of Manchester
+   - Location: Manchester, England
+   - Key Courses: Engineering, Business, Computer Science, Biomedical Sciences
+   - Entry Requirements: AAB at A-Level, IELTS 6.0–7.0
+   - Approx. Fees: £21,000–£30,000/year
+   - Scholarship: Global Futures Scholarship
 
-ReeLabs conducted India's FIRST and ONLY clinical trial using Mesenchymal Stem Cells derived from Placenta and Umbilical Cord Tissue against COVID-19.
+7. King's College London
+   - Location: London, England
+   - Key Courses: Law, Medicine, Nursing, War Studies, Dentistry
+   - Entry Requirements: AAA–ABB at A-Level, IELTS 6.5–7.0
+   - Approx. Fees: £22,000–£42,000/year
 
---- OSTEOARTHRITIS TREATMENT ---
-ReeLabs offers FDA-approved stem cell treatment for Osteoarthritis.
-- Clinically tested single-dose treatment
-- Quick results for knee pain
-- Non-surgical approach
+8. University of Warwick
+   - Location: Coventry, England
+   - Key Courses: Business (WBS), Economics, Maths, Computer Science
+   - Entry Requirements: AAA at A-Level, IELTS 6.0–7.0
+   - Approx. Fees: £21,000–£29,000/year
 
---- TOTICYTE ---
-ReeLabs has developed Toticyte, a product to treat Critical Limb Ischemia and Diabetic Foot.
-- Designed to salvage and heal limbs on the verge of amputation
-- Published in the prestigious American Journal of Stem Cells
+9. University of Bristol
+   - Location: Bristol, England
+   - Key Courses: Engineering, Law, Veterinary Science, Film & Television
+   - Entry Requirements: AAA–ABB at A-Level, IELTS 6.5
+   - Approx. Fees: £22,000–£28,000/year
 
---- GOLDEN VIAL ANTI-AGEING PROGRAM ---
-Golden Vial is a holistic, 360-degree, intensive Biological Age Reversal program.
-Patented protocol (granted in US, EU, UK, and India).
+10. University of Leeds
+    - Location: Leeds, England
+    - Key Courses: Engineering, Business, Media, Healthcare
+    - Entry Requirements: AAB–ABB at A-Level, IELTS 6.0–6.5
+    - Approx. Fees: £20,000–£27,000/year
 
-How it works:
-- Administration of young blood plasma and 240 types of organ-specific exosomes, interleukins, cytokines, and growth factors
-- Augmented by personalized ancillary activities, supplements, and topical serums
+--- IRELAND UNIVERSITIES (TOP PICKS) ---
 
-Expected results:
-- Younger looking skin
-- Reduced inflammation
-- Better sleep, appetite, and digestion
-- Increase in lean muscle mass
-- Weight loss
-- Better mental health and cognitive abilities
-- Improved libido and sexual performance
-- Improved stamina
-- Overall reduction in biological age by up to 20 years
+1. Trinity College Dublin (TCD)
+   - Location: Dublin, Ireland
+   - Key Courses: Computer Science, Business, Law, Medicine, Engineering
+   - Entry Requirements: Varies by course (high CAO points / equivalent), IELTS 6.5
+   - Approx. Fees: €18,000–€52,000/year
+   - Scholarship: Trinity Entrance Scholarships, Global Excellence Undergraduate Awards
 
-Program details:
-- Customized for each individual based on symptoms and reports
-- Effects last 5-10 years depending on genetics, immunity, and lifestyle
-- Non-invasive (no surgery involved)
-- No side effects
-- Results can be felt within days after the first session
-- No specific minimum age for enrollment (people as young as 30-40 may benefit)
-- Generally safe to undergo while on medication (doctors will advise during consultation)
+2. University College Dublin (UCD)
+   - Location: Dublin, Ireland
+   - Key Courses: Business, Engineering, Science, Medicine, Architecture
+   - Entry Requirements: IELTS 6.5, strong academic record
+   - Approx. Fees: €18,000–€38,000/year
+   - Scholarship: UCD Global Excellence Scholarship
 
-Testimonials from Golden Vial clients:
-- Charles (USA, 81 years old): Enhanced energy, sounder sleep, better appetite, jogging 5 miles daily
-- Carl (USA): Improved neuropathy, sperm morphology went from 2% to 8%, hair regrowth in darker color
-- Subir (India): Noticeable energy boost, working toward running a full marathon
-- Yasmin (Morocco): Feels lighter, more flexible, full of energy, hair fall stopped completely
-- Adrian (UK): Eyesight improved significantly, inflammation in heels and Achilles gone
-- Ocean (USA): Feels different, more resistance, better sleep, more power
+3. University of Galway (formerly NUI Galway)
+   - Location: Galway, Ireland
+   - Key Courses: Engineering, Biomedical Science, Marine Science, Arts
+   - Entry Requirements: IELTS 6.0–6.5
+   - Approx. Fees: €14,000–€28,000/year
 
---- WHAT ARE STEM CELLS (EDUCATIONAL) ---
-Stem cells are undifferentiated cells capable of self-renewal and differentiation.
-They can transform into any tissue or organ in the body.
+4. University College Cork (UCC)
+   - Location: Cork, Ireland
+   - Key Courses: Pharmacy, Food Science, Law, Computer Science
+   - Entry Requirements: IELTS 6.0–6.5
+   - Approx. Fees: €15,000–€30,000/year
 
-Key properties:
-- Plasticity: Can create cell types of entirely different tissues
-- Homing: Unique ability to get attracted to the site of injury
-- Engraftment: Unite with new tissue for smooth integration
+5. Dublin City University (DCU)
+   - Location: Dublin, Ireland
+   - Key Courses: Computing, Education, Business, Biotechnology
+   - Entry Requirements: IELTS 6.0–6.5
+   - Approx. Fees: €13,000–€20,000/year
 
-Types of Stem Cells:
-- Embryonic Stem Cells (ESCs): Pluripotent, from early embryos
-- Adult/Somatic Stem Cells: Multipotent, found in various tissues
-- Pluripotent Stem Cells (PSC): Characteristics of both HSCs and MSCs
-- Induced Pluripotent Stem Cells (iPSCs): Adult cells reprogrammed to behave like ESCs
-- Hematopoietic Stem Cells (HSCs): From bone marrow and cord blood, generate all blood cell types
-- Mesenchymal Stem Cells (MSCs): From bone marrow, adipose tissue, placenta — can differentiate into bone, cartilage, muscle, fat
+--- TEST SCORES & ENGLISH PROFICIENCY ---
 
---- CONTACT & SERVICES ---
-Website: www.reelabs.com
-Toll Free: 1800-222-454 (Mon-Fri, 10am-6pm)
-Contact Form: www.reelabs.com/contact-us
-Partner With Us: www.reelabs.com/partner-with-us
-Careers: www.reelabs.com/careers
-Pay Online: Available via EaseBuzz portal
-Wellness Products Shop: reelabswellness.com
-Parenting Support: www.reelabs.com/parenting
-Baby Registry: www.reelabs.com/stem-cell-banking-baby-registry
-Biological Age Testing: www.reelabs.com/biological-age-testing
+IELTS (International English Language Testing System):
+- Academic version required for university admissions
+- Scored on a 9-band scale (Listening, Reading, Writing, Speaking)
+- Most UK/Ireland universities require 6.0–7.5 overall with minimum 5.5–6.5 per band
+- Test fee: Approx. ₹16,250 / $232
+- Validity: 2 years from test date
+- Tip: Start preparation 3–6 months before the target test date
+
+PTE Academic (Pearson Test of English):
+- Computer-based test, results in 2–5 business days
+- Scored 10–90
+- Most universities accept PTE scores of 50–76 (equivalent to IELTS 6.0–7.0)
+- Test fee: Approx. ₹15,900 / $210
+- Validity: 2 years
+
+TOEFL iBT:
+- Internet-based test by ETS
+- Scored 0–120
+- Most UK/Ireland universities accept 80–100+
+- Test fee: Approx. ₹16,900 / $205
+- Validity: 2 years
+
+Duolingo English Test:
+- Online test, results in 48 hours
+- Scored 10–160
+- Accepted by some UK/Ireland universities (check specific requirements)
+- Test fee: Approx. $59
+- Validity: 2 years
+
+--- VISA INFORMATION ---
+
+UK Student Visa (Tier 4 / Student Route):
+- Required for courses longer than 6 months
+- Must have a Confirmation of Acceptance for Studies (CAS) from a licensed sponsor
+- Financial requirements: Proof of funds to cover tuition + living costs (£1,334/month for London, £1,023/month outside London) for up to 9 months
+- Application fee: £490
+- Immigration Health Surcharge (IHS): £776/year
+- Processing time: 3–6 weeks
+- Can work up to 20 hours/week during term, full-time during holidays
+- Post-study work: Graduate Route visa allows 2 years (3 years for PhD) of unrestricted work after graduation
+
+Ireland Student Visa (Stamp 2):
+- Required for non-EEA students for courses longer than 3 months
+- Must have acceptance letter from recognised Irish institution
+- Financial requirements: Proof of €10,000 in your bank account
+- Application fee: €60 (single entry) / €100 (multi-entry)
+- Processing time: 4–8 weeks
+- Can work up to 20 hours/week during term, 40 hours/week during holidays
+- Post-study work: Third Level Graduate Programme allows 1–2 years stay to find employment
+
+--- SCHOLARSHIPS & FINANCIAL AID ---
+
+UK Scholarships:
+- Chevening Scholarships (UK Government, fully funded Master's for outstanding professionals)
+- Commonwealth Scholarships (for students from Commonwealth countries)
+- GREAT Scholarships (for students from select countries, £10,000 towards tuition)
+- University-specific merit scholarships (£2,000–£20,000)
+
+Ireland Scholarships:
+- Government of Ireland International Education Scholarships (€10,000 per year for Master's/PhD)
+- Science Foundation Ireland scholarships
+- University-specific scholarships (€2,000–€10,000)
+
+Tips for Scholarship Applications:
+1. Apply early — many deadlines are 6–9 months before course start
+2. Prepare a strong personal statement
+3. Showcase academic achievements AND extracurricular activities
+4. Get strong recommendation letters
+5. Research university-specific scholarships — many go unclaimed
+
+--- APPLICATION TIMELINE ---
+
+For September Intake (Main Intake):
+- 12–18 months before: Research universities and courses
+- 9–12 months before: Take IELTS/PTE/TOEFL
+- 6–9 months before: Submit applications through UCAS (UK) or directly (Ireland)
+- 4–6 months before: Receive offers, pay deposits
+- 2–4 months before: Apply for student visa
+- 1–2 months before: Arrange accommodation, book flights
+- Pre-departure: Attend orientation sessions
+
+For January Intake (Limited courses):
+- Shift timeline forward by 4 months
+- Fewer courses available, but less competition
+
+--- COST OF LIVING ---
+
+UK (Annual estimates):
+- London: £15,000–£18,000/year
+- Outside London: £12,000–£15,000/year
+- Accommodation: £6,000–£12,000/year (halls or shared flats)
+- Food: £2,400–£3,600/year
+- Transport: £600–£1,200/year
+- Personal expenses: £1,200–£2,400/year
+
+Ireland (Annual estimates):
+- Dublin: €12,000–€15,000/year
+- Outside Dublin: €9,000–€12,000/year
+- Accommodation: €5,000–€10,000/year
+- Food: €2,400–€3,600/year
+- Transport: €500–€1,000/year
+
+--- ACCOMMODATION ---
+
+Types available:
+1. University Halls of Residence (recommended for first-year students)
+2. Private student accommodation (managed properties like Unite Students, IQ Student)
+3. Shared flats/houses (cheaper, more independence)
+4. Homestay families (cultural immersion)
+
+Tips:
+- Apply for halls EARLY (within days of receiving your offer)
+- Dublin and London have the tightest housing markets
+- Budget £150–£250/week for London, £100–£180/week outside
+
+--- FAQ ---
+
+Q: Can I work while studying in the UK?
+A: Yes, Tier 4 student visa allows 20 hours/week part-time during term and full-time during holidays.
+
+Q: Is a gap year accepted by UK/Ireland universities?
+A: Yes, most universities accept gap years. Some may ask for an explanation in your personal statement.
+
+Q: What is UCAS?
+A: UCAS (Universities and Colleges Admissions Service) is the centralised application system for UK undergraduate courses. You can apply to up to 5 universities through one application.
+
+Q: Do I need to take IELTS if I studied in English-medium school?
+A: Most UK/Ireland universities still require an English test unless your previous degree was from an English-speaking country (UK, USA, Australia, Canada, etc.). Some accept a school waiver — check individual university policies.
+
+Q: What is the Graduate Route visa?
+A: The Graduate Route visa (UK) allows international students to stay and work in the UK for 2 years after completing their degree (3 years for PhD). No sponsorship needed.
+
+Q: Can I bring my family on a student visa?
+A: UK: Only if you're on a course of 9+ months at postgraduate level and have sufficient funds. Ireland: Generally not for student visa holders.
+
+Q: How much bank balance do I need to show?
+A: UK: Tuition fees + £1,334/month (London) or £1,023/month (outside London) for up to 9 months. Ireland: Minimum €10,000.
 
 ===== END OF KNOWLEDGE BASE =====
