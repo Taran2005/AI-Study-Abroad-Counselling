@@ -427,7 +427,7 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 
 			{/* Right: Chat Panel */}
 			{isChatOpen && (
-				<div className="flex flex-col w-full max-w-sm rounded-2xl bg-card border border-border overflow-hidden">
+				<div className="flex flex-col w-full max-w-sm rounded-2xl bg-card border border-border overflow-hidden h-[calc(100vh-120px)]">
 					{/* Chat Header */}
 					<div className="flex items-center gap-2 px-4 py-3 border-b border-border">
 						<MessageSquare className="h-4 w-4 text-primary" />
@@ -438,7 +438,7 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 					</div>
 
 					{/* Chat Messages */}
-					<ScrollArea className="flex-1 p-4 min-h-0">
+					<div className="flex-1 overflow-y-auto p-4 min-h-0">
 						<div className="flex flex-col gap-3">
 							{allMessages.length === 0 && (
 								<p className="text-xs text-muted-foreground text-center py-8">
@@ -468,7 +468,7 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 							))}
 							<div ref={chatEndRef} />
 						</div>
-					</ScrollArea>
+					</div>
 
 					{/* Chat Input */}
 					<div className="flex items-center gap-2 p-3 border-t border-border">

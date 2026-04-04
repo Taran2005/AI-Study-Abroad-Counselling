@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -185,66 +186,67 @@ export default function LiveConversationsPage() {
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 					{conversations.map((convo) => (
-						<Card
+						<Link
 							key={convo.id}
-							className="border-primary/10 bg-card/80 hover:shadow-lg transition-all duration-300 group relative overflow-hidden"
+							href={`/dashboard/conversations/${convo.id}`}
+							className="block"
 						>
-							{/* Animated pulse border */}
-							<div className="absolute inset-0 rounded-lg border-2 border-primary/20 animate-pulse pointer-events-none" />
+							<Card className="border-primary/10 bg-card/80 hover:shadow-lg transition-all duration-300 group relative overflow-hidden cursor-pointer">
+								{/* Animated pulse border */}
+								<div className="absolute inset-0 rounded-lg border-2 border-primary/20 animate-pulse pointer-events-none" />
 
-							<CardContent className="py-5 px-5 space-y-4">
-								<div className="flex items-center justify-between">
-									<div className="flex items-center gap-2">
-										<div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-											<Mic className="w-4 h-4 text-primary" />
+								<CardContent className="py-5 px-5 space-y-4">
+									<div className="flex items-center justify-between">
+										<div className="flex items-center gap-2">
+											<div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+												<Mic className="w-4 h-4 text-primary" />
+											</div>
+											<div>
+												<p className="text-sm font-semibold text-foreground">
+													{convo.room_name || "Session"}
+												</p>
+												<p className="text-xs text-muted-foreground">
+													{convo.language === "hi" ? "Hindi" : "English"}
+												</p>
+											</div>
 										</div>
-										<div>
-											<p className="text-sm font-semibold text-foreground">
-												{convo.room_name || "Session"}
-											</p>
-											<p className="text-xs text-muted-foreground">
-												{convo.language === "hi"
-													? "Hindi"
-													: "English"}
-											</p>
+										<Badge
+											variant="outline"
+											className="text-xs rounded-full border-primary/25 text-primary gap-1"
+										>
+											<span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+											Live
+										</Badge>
+									</div>
+
+									<div className="flex items-center gap-4">
+										<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+											<Clock className="w-3.5 h-3.5" />
+											{getElapsedTime(convo.started_at)}
+										</div>
+										<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+											<Volume2 className="w-3.5 h-3.5" />
+											Active
 										</div>
 									</div>
-									<Badge
-										variant="outline"
-										className="text-xs rounded-full border-primary/25 text-primary gap-1"
-									>
-										<span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-										Live
-									</Badge>
-								</div>
 
-								<div className="flex items-center gap-4">
-									<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-										<Clock className="w-3.5 h-3.5" />
-										{getElapsedTime(convo.started_at)}
+									{/* Waveform visualization */}
+									<div className="flex items-end gap-0.5 h-8">
+										{Array.from({ length: 20 }).map((_, i) => (
+											<div
+												key={i}
+												className="flex-1 bg-primary/30 rounded-t-sm animate-pulse"
+												style={{
+													height: `${20 + Math.random() * 80}%`,
+													animationDelay: `${i * 100}ms`,
+													animationDuration: `${800 + Math.random() * 400}ms`,
+												}}
+											/>
+										))}
 									</div>
-									<div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-										<Volume2 className="w-3.5 h-3.5" />
-										Active
-									</div>
-								</div>
-
-								{/* Waveform visualization */}
-								<div className="flex items-end gap-0.5 h-8">
-									{Array.from({ length: 20 }).map((_, i) => (
-										<div
-											key={i}
-											className="flex-1 bg-primary/30 rounded-t-sm animate-pulse"
-											style={{
-												height: `${20 + Math.random() * 80}%`,
-												animationDelay: `${i * 100}ms`,
-												animationDuration: `${800 + Math.random() * 400}ms`,
-											}}
-										/>
-									))}
-								</div>
-							</CardContent>
-						</Card>
+								</CardContent>
+							</Card>
+						</Link>
 					))}
 				</div>
 			)}

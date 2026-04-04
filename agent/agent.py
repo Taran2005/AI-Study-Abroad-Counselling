@@ -11,7 +11,6 @@ A LiveKit voice agent for overseas education counselling using:
 
 import asyncio
 import logging
-from datetime import datetime, timezone
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +22,7 @@ from data_pipeline import (
     create_conversation,
     update_conversation,
     extract_student_data,
+    analyze_sentiment,
     run_post_call_pipeline,
 )
 
@@ -40,10 +40,9 @@ from livekit.agents import (
     inference,
 )
 from livekit.agents.llm import ImageContent
+from livekit.agents.voice.events import ConversationItemAddedEvent, CloseEvent
 from livekit.plugins import openai, anam, silero, deepgram, elevenlabs
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-
-from data_pipeline import run_post_call_pipeline, create_conversation
 
 load_dotenv(".env.local")
 
@@ -263,11 +262,11 @@ class LunaAssistant(Agent):
                 "Your job is to help students navigate studying abroad, specifically in the UK and Ireland. "
                 "You are friendly, empathetic, and highly knowledgeable about university admissions, IELTS/PTE preparation, "
                 "scholarships, visas, and living costs abroad. "
-                "Keep your responses naturally conversational, concise, and professional. Avoid long lists or markdown formatting. "
+                "CONVERSATIONAL PACING (CRITICAL): Always ask ONLY ONE question at a time. Never overwhelm the student with multiple questions in a single response. Wait for their answer before moving to the next topic. "
+                "SMART EXTRACTION: Through natural conversation, aim to gradually collect: Name, Education Level, Target Country, Course Interest, IELTS/PTE Score, and Budget. "
+                "PROACTIVE VISION: If the student mentions their grades, percentage, or IELTS/PTE score, explicitly ask them to hold their marksheet or scorecard up to the camera so you can verify it. Describe what you see when they do! "
                 "CRITICAL INSTRUCTION: If a user asks to search, find, or recommend universities, you MUST immediately call the `search_universities` tool. Do not just list options from memory if they ask for a search.\n"
                 "CRITICAL INSTRUCTION: If a user asks about detailed procedures, visa policies, intricate document details, or anything specific not found in your standard memory, you MUST immediately call the `search_knowledge_base` tool to look it up in the PDF database."
-                "\n\n--- KNOWLEDGE BASE ---\n"
-                f"{_knowledge_base}"
             ),
         )
 
@@ -279,7 +278,11 @@ class LunaAssistant(Agent):
     async def on_enter(self) -> None:
         """Set up video tracks and create conversation record in Supabase."""
         room = get_job_context().room
-        logger.info("LunaAssistant on_enter: setting up video track handlers")
+        logger.info("StudyBuddyAIAssistant on_enter: setting up video track handlers")
+        
+        # Immediately create conversation so it appears LIVE on the dashboard
+        self._conversation_id = await create_conversation(room.name)
+        self._session_started_at = datetime.now(timezone.utc)
 
         for participant in room.remote_participants.values():
             for publication in participant.track_publications.values():
@@ -389,17 +392,18 @@ async def studybuddyai_agent(ctx: agents.JobContext):
         turn_handling=TurnHandlingOptions(turn_detection=MultilingualModel()),
     )
 
-    avatar = anam.AvatarSession(
-        persona_config=anam.PersonaConfig(
-            name="Luna",
-            avatarId=os.environ.get("ANAM_AVATAR_ID", "071b0286-4cce-4808-bee2-e642f1062de3"),
-        ),
-    )
+    # avatar = anam.AvatarSession(
+    #     persona_config=anam.PersonaConfig(
+    #         name="Luna",
+    #         avatarId=os.environ.get("ANAM_AVATAR_ID", "071b0286-4cce-4808-bee2-e642f1062de3"),
+    #     ),
+    # )
 
-    await avatar.start(session, room=ctx.room)
+    # await avatar.start(session, room=ctx.room)
 
     # Start the agent session with the user, using custom text input handler for vision
     _agent_instance = LunaAssistant()
+    await _agent_instance.on_enter()
     await session.start(
         room=ctx.room,
         agent=_agent_instance,
@@ -408,35 +412,113 @@ async def studybuddyai_agent(ctx: agents.JobContext):
         ),
     )
 
-    # ── Data Pipeline: Register disconnect handler ──
-    @ctx.room.on("disconnected")
-    def on_room_disconnected():
-        """Run the full post-call pipeline when the room disconnects."""
-        async def run_pipeline():
+    # ── Live Transcript Capture ──
+    @session.on("conversation_item_added")
+    def _on_conversation_item_added(event: ConversationItemAddedEvent):
+        """Capture every user/assistant message into the local transcript list."""
+        if not isinstance(event.item, llm.ChatMessage):
+            return
+        msg = event.item
+        if msg.role not in ("user", "assistant"):
+            return
+        # Extract text content
+        text = ""
+        if isinstance(msg.content, str):
+            text = msg.content
+        elif isinstance(msg.content, list):
+            text = " ".join(str(c) for c in msg.content if isinstance(c, str))
+        if not text.strip():
+            return
+        _agent_instance._transcript.append({
+            "role": msg.role,
+            "text": text.strip(),
+            "ts": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.debug(f"Transcript captured: [{msg.role}] {text[:80]}...")
+
+        # Immediately push transcript to DB for near-real-time dashboard updates
+        async def _push_transcript():
             agent = _agent_instance
-            if agent and getattr(agent, "_conversation_id", None) and getattr(agent, "_transcript", None):
-                logger.info(f"Room disconnected — running post-call pipeline for {agent._conversation_id}")
+            if agent._conversation_id:
                 try:
-                    await run_post_call_pipeline(
-                        conversation_id=agent._conversation_id,
-                        transcript=agent._transcript,
-                        started_at=getattr(agent, "_session_started_at", None),
+                    await update_conversation(
+                        agent._conversation_id,
+                        transcript=list(agent._transcript),
                     )
                 except Exception as e:
-                    logger.error(f"Post-call pipeline failed: {e}")
-            elif agent and getattr(agent, "_conversation_id", None):
-                # Mark as completed even if no transcript
+                    logger.debug(f"Immediate transcript push failed (non-fatal): {e}")
+        asyncio.create_task(_push_transcript())
+
+    # ── Periodic Live Sync (every 5 seconds) ──
+    async def _live_sync_loop():
+        """Background loop: push transcript + sentiment + extracted data to DB."""
+        agent = _agent_instance
+        while True:
+            await asyncio.sleep(5)
+            if not agent._conversation_id or not agent._transcript:
+                continue
+            try:
+                transcript = list(agent._transcript)  # snapshot
+                # Run extraction and sentiment in parallel
+                extracted, (sentiment_entries, _) = await asyncio.gather(
+                    extract_student_data(transcript),
+                    analyze_sentiment(transcript),
+                )
                 await update_conversation(
                     agent._conversation_id,
-                    status="completed",
-                    ended_at=datetime.now(timezone.utc).isoformat(),
+                    transcript=transcript,
+                    extracted_data=extracted,
+                    sentiment_log=sentiment_entries,
                 )
-                logger.info("Room disconnected with empty transcript — marked as completed")
-        asyncio.create_task(run_pipeline())
+                logger.info(f"Live sync: pushed {len(transcript)} msgs, {len(extracted)} fields")
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Live sync failed (non-fatal): {e}")
+
+    sync_task = asyncio.create_task(_live_sync_loop())
+
+    _pipeline_ran = False
+
+    async def _run_close_pipeline():
+        nonlocal _pipeline_ran
+        if _pipeline_ran:
+            return
+        _pipeline_ran = True
+        sync_task.cancel()
+
+        agent = _agent_instance
+        if agent and getattr(agent, "_conversation_id", None) and getattr(agent, "_transcript", None):
+            logger.info(f"Session ended — running post-call pipeline for {agent._conversation_id}")
+            try:
+                await run_post_call_pipeline(
+                    conversation_id=agent._conversation_id,
+                    transcript=agent._transcript,
+                    started_at=getattr(agent, "_session_started_at", None),
+                )
+            except Exception as e:
+                logger.error(f"Post-call pipeline failed: {e}")
+        elif agent and getattr(agent, "_conversation_id", None):
+            await update_conversation(
+                agent._conversation_id,
+                status="completed",
+                ended_at=datetime.now(timezone.utc).isoformat(),
+            )
+            logger.info("Session ended with empty transcript — marked as completed")
+
+    # ── Session Close: Primary handler ──
+    @session.on("close")
+    def _on_session_close(event: CloseEvent):
+        asyncio.create_task(_run_close_pipeline())
+
+    # ── Room Disconnect: Fallback handler ──
+    @ctx.room.on("disconnected")
+    def _on_room_disconnected():
+        asyncio.create_task(_run_close_pipeline())
 
     # Generate an initial greeting
     await session.generate_reply(
-        instructions="Greet the user warmly and introduce yourself as Luna. Offer your assistance."
+        instructions="Greet the user warmly and introduce yourself as StudyBuddyAI. Offer your assistance."
     )
 
 
