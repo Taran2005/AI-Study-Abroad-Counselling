@@ -171,6 +171,131 @@ async def create_student_profile(extracted_data: dict) -> Optional[str]:
         return None
 
 
+async def fetch_student_persona(
+    phone: Optional[str] = None, email: Optional[str] = None
+) -> Optional[dict]:
+    """
+    Look up an existing student profile by phone or email.
+    Returns a dict with 'found', 'profile', 'past_conversations', 'lead_score'
+    or None on error.
+    """
+    if not phone and not email:
+        return None
+
+    params = {}
+    if phone:
+        params["phone"] = phone
+    elif email:
+        params["email"] = email
+
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.get(
+                f"{API_BASE_URL}/api/students/persona",
+                params=params,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+
+            if data.get("found"):
+                logger.info(
+                    f"Persona found for {'phone=' + phone if phone else 'email=' + str(email)}"
+                )
+            else:
+                logger.info(
+                    f"No persona found for {'phone=' + phone if phone else 'email=' + str(email)}"
+                )
+
+            return data
+    except Exception as e:
+        logger.error(f"Failed to fetch student persona: {e}")
+        return None
+
+
+def format_persona_context(persona_data: dict) -> str:
+    """
+    Convert the raw persona API response into a compact context string
+    that can be injected into the LLM conversation.
+    Excludes transcripts to keep context window lean.
+    """
+    if not persona_data or not persona_data.get("found"):
+        return "No existing profile found. This appears to be a new student."
+
+    profile = persona_data.get("profile", {})
+    lead = persona_data.get("lead_score")
+    past_convos = persona_data.get("past_conversations", [])
+
+    lines = ["=== RETURNING STUDENT PROFILE ==="]
+
+    # Basic info
+    if profile.get("name"):
+        lines.append(f"Name: {profile['name']}")
+    if profile.get("phone"):
+        lines.append(f"Phone: {profile['phone']}")
+    if profile.get("email"):
+        lines.append(f"Email: {profile['email']}")
+    if profile.get("location"):
+        lines.append(f"Location: {profile['location']}")
+
+    # Academic
+    if profile.get("education_level"):
+        lines.append(f"Education Level: {profile['education_level']}")
+    if profile.get("field_of_study"):
+        lines.append(f"Field of Study: {profile['field_of_study']}")
+    if profile.get("institution"):
+        lines.append(f"Institution: {profile['institution']}")
+    if profile.get("gpa"):
+        lines.append(f"GPA: {profile['gpa']}")
+
+    # Preferences
+    if profile.get("target_countries"):
+        countries = profile["target_countries"]
+        if isinstance(countries, list):
+            lines.append(f"Target Countries: {', '.join(countries)}")
+        else:
+            lines.append(f"Target Countries: {countries}")
+    if profile.get("course_interest"):
+        lines.append(f"Course Interest: {profile['course_interest']}")
+    if profile.get("preferred_intake"):
+        lines.append(f"Preferred Intake: {profile['preferred_intake']}")
+
+    # Test scores
+    if profile.get("test_type"):
+        score_str = profile.get("test_score", "not available")
+        lines.append(f"Test: {profile['test_type']} (Score: {score_str})")
+
+    # Budget
+    if profile.get("budget_range"):
+        lines.append(f"Budget: {profile['budget_range']}")
+    if profile.get("scholarship_interest") is not None:
+        lines.append(
+            f"Scholarship Interest: {'Yes' if profile['scholarship_interest'] else 'No'}"
+        )
+    if profile.get("timeline"):
+        lines.append(f"Timeline: {profile['timeline']}")
+
+    # Lead score
+    if lead:
+        classification = lead.get("classification", "unknown").upper()
+        total = lead.get("total_score", 0)
+        lines.append(f"\nLead Score: {total}/100 ({classification})")
+        lines.append(f"  Intent: {lead.get('intent_score', 0)} | Financial: {lead.get('financial_score', 0)} | Timeline: {lead.get('timeline_score', 0)}")
+        if lead.get("notes"):
+            lines.append(f"  Notes: {lead['notes']}")
+
+    # Past conversations
+    if past_convos:
+        lines.append(f"\nPast Conversations: {len(past_convos)}")
+        for c in past_convos[:3]:
+            date = c.get("date", "unknown")[:10]
+            dur = c.get("duration_secs") or 0
+            lines.append(f"  - {date} ({dur}s, {c.get('status', 'unknown')})")
+
+    lines.append("=== END PROFILE ===")
+
+    return "\n".join(lines)
+
+
 # ============================================================
 # LLM-Powered Extraction & Scoring
 # ============================================================

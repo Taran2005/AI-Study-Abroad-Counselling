@@ -24,6 +24,8 @@ from data_pipeline import (
     extract_student_data,
     analyze_sentiment,
     run_post_call_pipeline,
+    fetch_student_persona,
+    format_persona_context,
 )
 
 from livekit import agents, rtc
@@ -292,6 +294,42 @@ class LunaAssistant(Agent):
             logger.error(f"Knowledge base search failed: {e}")
             return "The database is currently unreachable. Rely on your general knowledge to assist the user."
 
+    @llm.function_tool(
+        description="Look up a returning student's existing profile from the database using their phone number or email address. Call this IMMEDIATELY after the student provides their phone or email at the start of the conversation. Returns their full profile including past preferences, test scores, budget, and lead score so you can personalize the conversation and skip questions they already answered."
+    )
+    async def lookup_student_profile(
+        self,
+        phone: str = "",
+        email: str = "",
+    ):
+        """
+        Fetch the persona/profile of a returning student from the database.
+
+        Args:
+            phone: The student's phone number (e.g. '+919876543210'). Provide this OR email.
+            email: The student's email address. Provide this OR phone.
+        """
+        if not phone and not email:
+            return "I need either a phone number or an email address to look up the student's profile."
+
+        logger.info(f"Looking up student persona: phone={phone}, email={email}")
+
+        persona_data = await fetch_student_persona(
+            phone=phone if phone else None,
+            email=email if email else None,
+        )
+
+        if persona_data is None:
+            return "I couldn't reach the database right now. Let's continue as a new conversation and I'll gather your details fresh."
+
+        if not persona_data.get("found"):
+            return "No existing profile found for that contact information. This is a new student — proceed with the full questionnaire."
+
+        # Format and return the context string
+        context = format_persona_context(persona_data)
+        logger.info(f"Persona context loaded: {len(context)} chars")
+        return context
+
     def __init__(self) -> None:
         self._transcript: list[dict] = []
         self._conversation_id: str | None = None
@@ -330,8 +368,16 @@ class LunaAssistant(Agent):
                 "# SMART QUESTIONNAIRE FLOW\n"
                 "Your goal is to build a complete student profile through natural conversation. "
                 "Follow this sequence, asking ONE question per turn. Skip questions the student already answered.\n\n"
+                "**Phase 0 — Returning Student Check (ALWAYS DO THIS FIRST):**\n"
+                "1. Greet warmly and introduce yourself.\n"
+                "2. Ask: 'Have you spoken with us before? If so, could you share your phone number or email so I can pull up your profile?'\n"
+                "3. If they provide a phone number or email, IMMEDIATELY call the `lookup_student_profile` tool.\n"
+                "4. If a profile is found: Welcome them back by name. Summarize what you already know about them in ONE sentence "
+                "(e.g. 'I can see you're interested in CS in the UK with an IELTS of 7.0. Let's pick up where we left off!'). "
+                "Then SKIP to the next phase where you have missing data. Do NOT re-ask questions you already have answers to.\n"
+                "5. If no profile is found, or they say they're new: Say 'No problem! Let me get to know you.' and proceed with Phase 1.\n\n"
                 "**Phase 1 — Introduction & Basics:**\n"
-                "1. Greet warmly. Ask their name.\n"
+                "1. Ask their name.\n"
                 "2. Ask what country they want to study in (UK, Ireland, or both).\n"
                 "3. Ask whether they're looking at undergraduate or postgraduate.\n\n"
                 "**Phase 2 — Academic Profile:**\n"
@@ -369,6 +415,12 @@ class LunaAssistant(Agent):
                 "## check_availability + book_consultation\n"
                 "- When the student wants to book a follow-up, first call check_availability with a date.\n"
                 "- Then call book_consultation with the chosen slot, student name, and email.\n\n"
+                "## lookup_student_profile (USE AT START)\n"
+                "- Call this IMMEDIATELY after the student provides their phone number or email at the start.\n"
+                "- If you get a profile back, use it to personalize the entire conversation.\n"
+                "- SKIP all questionnaire questions that already have answers in the profile.\n"
+                "- Only ask about missing or outdated data points.\n"
+                "- If the student says they are new, skip this tool entirely.\n\n"
 
                 "# IMPORTANT RULES\n"
                 "- Ask ONLY ONE question per turn. Wait for the answer.\n"
