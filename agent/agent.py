@@ -49,7 +49,9 @@ load_dotenv(".env.local")
 logger = logging.getLogger("studybuddyai-agent")
 logger.setLevel(logging.DEBUG)
 fh = logging.FileHandler("vision_debug.log", mode="w")
-fh.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+fh.setFormatter(
+    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+)
 logger.addHandler(fh)
 
 # Load knowledge base for system prompt injection
@@ -68,7 +70,9 @@ def send_confirmation_email(to_email: str, user_name: str, date: str, time: str)
 
     try:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Your StudyBuddyAI AI Overseas Education Consultation is Confirmed!"
+        msg["Subject"] = (
+            "Your StudyBuddyAI AI Overseas Education Consultation is Confirmed!"
+        )
         msg["From"] = f"StudyBuddyAI Counsellor <{sender_email}>"
         msg["To"] = to_email
 
@@ -104,7 +108,7 @@ def send_confirmation_email(to_email: str, user_name: str, date: str, time: str)
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender_email, sender_password)
             server.sendmail(sender_email, to_email, msg.as_string())
-        
+
         logger.info(f"Confirmation email successfully sent to {to_email}")
     except Exception as e:
         logger.error(f"Failed to send email to {to_email}: {e}")
@@ -113,7 +117,9 @@ def send_confirmation_email(to_email: str, user_name: str, date: str, time: str)
 class LunaAssistant(Agent):
     """Luna AI assistant persona with vision capabilities."""
 
-    @llm.function_tool(description="Book a consultation appointment for the user. Call this when the user explicitly agrees to book a time and provides their details.")
+    @llm.function_tool(
+        description="Book a consultation appointment for the user. Call this when the user explicitly agrees to book a time and provides their details."
+    )
     async def book_consultation(
         self,
         user_name: str,
@@ -123,7 +129,7 @@ class LunaAssistant(Agent):
     ):
         """
         Book a consultation appointment for the user.
-        
+
         Args:
             user_name: The user's full name.
             user_email: The user's email address.
@@ -131,10 +137,14 @@ class LunaAssistant(Agent):
             time: The preferred time of the appointment.
         """
         logger.info(f"Booking consultation for {user_name} on {date} at {time}")
-        await asyncio.to_thread(send_confirmation_email, user_email, user_name, date, time)
+        await asyncio.to_thread(
+            send_confirmation_email, user_email, user_name, date, time
+        )
         return "Booking successful! The confirmation email has been sent."
 
-    @llm.function_tool(description="Search for university recommendations based on the student's profile and preferences. Call this when the student wants to know which universities would be a good fit, or when you have enough profile data to suggest options.")
+    @llm.function_tool(
+        description="Search for university recommendations based on the student's profile and preferences. Call this when the student wants to know which universities would be a good fit, or when you have enough profile data to suggest options."
+    )
     async def search_universities(
         self,
         query: str,
@@ -148,7 +158,7 @@ class LunaAssistant(Agent):
             country: Optional filter — 'UK' or 'Ireland'. Leave empty for both.
         """
         logger.info(f"Searching universities: query='{query}', country='{country}'")
-        
+
         api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
 
         try:
@@ -174,15 +184,19 @@ class LunaAssistant(Agent):
             for i, uni in enumerate(universities, 1):
                 parts = [f"{i}. {uni.get('name', 'Unknown')}"]
                 if uni.get("city"):
-                    parts.append(f"   Location: {uni['city']}, {uni.get('country', '')}")
+                    parts.append(
+                        f"   Location: {uni['city']}, {uni.get('country', '')}"
+                    )
                 if uni.get("ranking"):
                     parts.append(f"   Ranking: #{uni['ranking']}")
-                
+
                 # Costs
                 costs = uni.get("costs", {})
                 if costs.get("tuition_min") or costs.get("tuition_max"):
                     currency = costs.get("currency", "GBP")
-                    parts.append(f"   Tuition: {currency} {costs.get('tuition_min', 'N/A')} - {costs.get('tuition_max', 'N/A')}")
+                    parts.append(
+                        f"   Tuition: {currency} {costs.get('tuition_min', 'N/A')} - {costs.get('tuition_max', 'N/A')}"
+                    )
 
                 # Requirements
                 reqs = uni.get("requirements", {})
@@ -192,7 +206,9 @@ class LunaAssistant(Agent):
                 # Scholarships
                 scholarships = uni.get("scholarships", [])
                 if scholarships:
-                    names = [s.get("name", "") for s in scholarships[:2] if s.get("name")]
+                    names = [
+                        s.get("name", "") for s in scholarships[:2] if s.get("name")
+                    ]
                     if names:
                         parts.append(f"   Scholarships: {', '.join(names)}")
 
@@ -204,19 +220,21 @@ class LunaAssistant(Agent):
             logger.error(f"University search failed: {e}")
             return "I'm having trouble searching our university database right now. Let me share recommendations based on my general knowledge instead."
 
-    @llm.function_tool(description="Search the internal PDF knowledge base for specific information, policies, visa rules, procedures, or facts that are not about searching for universities.")
+    @llm.function_tool(
+        description="Search the internal PDF knowledge base for specific information, policies, visa rules, procedures, or facts that are not about searching for universities."
+    )
     async def search_knowledge_base(
         self,
         query: str,
     ):
         """
         Query the PDF vector database for precise information.
-        
+
         Args:
             query: The specific question or topic to search for in the PDFs.
         """
         logger.info(f"Searching knowledge base for: query='{query}'")
-        
+
         api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
 
         try:
@@ -238,14 +256,18 @@ class LunaAssistant(Agent):
             for i, res in enumerate(results, 1):
                 doc_title = res.get("doc_title", "Unknown Document")
                 content = res.get("content", "").strip()
-                formatted_chunks.append(f"--- From Document: {doc_title} ---\n{content}")
+                formatted_chunks.append(
+                    f"--- From Document: {doc_title} ---\n{content}"
+                )
 
-            return "Here is the information from our internal documents:\n\n" + "\n\n".join(formatted_chunks)
+            return (
+                "Here is the information from our internal documents:\n\n"
+                + "\n\n".join(formatted_chunks)
+            )
 
         except Exception as e:
             logger.error(f"Knowledge base search failed: {e}")
             return "The database is currently unreachable. Rely on your general knowledge to assist the user."
-
 
     def __init__(self) -> None:
         self._transcript: list[dict] = []
@@ -270,16 +292,19 @@ class LunaAssistant(Agent):
             ),
         )
 
-
     @property
     def latest_frame(self):
-        return self._latest_screen_frame if self._latest_screen_frame else self._latest_camera_frame
+        return (
+            self._latest_screen_frame
+            if self._latest_screen_frame
+            else self._latest_camera_frame
+        )
 
     async def on_enter(self) -> None:
         """Set up video tracks and create conversation record in Supabase."""
         room = get_job_context().room
         logger.info("StudyBuddyAIAssistant on_enter: setting up video track handlers")
-        
+
         # Immediately create conversation so it appears LIVE on the dashboard
         self._conversation_id = await create_conversation(room.name)
         self._session_started_at = datetime.now(timezone.utc)
@@ -302,7 +327,10 @@ class LunaAssistant(Agent):
             publication: rtc.RemoteTrackPublication,
             participant: rtc.RemoteParticipant,
         ):
-            if track.kind == rtc.TrackKind.KIND_VIDEO and participant.identity != "anam-avatar-agent":
+            if (
+                track.kind == rtc.TrackKind.KIND_VIDEO
+                and participant.identity != "anam-avatar-agent"
+            ):
                 self._create_video_stream(
                     track,
                     publication.source == rtc.TrackSource.SOURCE_SCREENSHARE,
@@ -347,7 +375,9 @@ class LunaAssistant(Agent):
                     self._latest_camera_frame = event.frame
 
         task = asyncio.create_task(read_stream())
-        task.add_done_callback(lambda t: self._tasks.remove(t) if t in self._tasks else None)
+        task.add_done_callback(
+            lambda t: self._tasks.remove(t) if t in self._tasks else None
+        )
         self._tasks.append(task)
 
 
@@ -363,8 +393,9 @@ async def vision_text_input_cb(
     global _agent_instance
     content: list = [event.text]
 
+    # Note: Transcript is already captured via conversation_item_added event
+    # Only add video frame if available
     if _agent_instance:
-        _agent_instance._transcript.append({"role": "user", "text": event.text})
         frame = _agent_instance.latest_frame
         if frame:
             content.append(ImageContent(image=frame))
@@ -429,11 +460,13 @@ async def studybuddyai_agent(ctx: agents.JobContext):
             text = " ".join(str(c) for c in msg.content if isinstance(c, str))
         if not text.strip():
             return
-        _agent_instance._transcript.append({
-            "role": msg.role,
-            "text": text.strip(),
-            "ts": datetime.now(timezone.utc).isoformat(),
-        })
+        _agent_instance._transcript.append(
+            {
+                "role": msg.role,
+                "text": text.strip(),
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         logger.debug(f"Transcript captured: [{msg.role}] {text[:80]}...")
 
         # Immediately push transcript to DB for near-real-time dashboard updates
@@ -447,6 +480,7 @@ async def studybuddyai_agent(ctx: agents.JobContext):
                     )
                 except Exception as e:
                     logger.debug(f"Immediate transcript push failed (non-fatal): {e}")
+
         asyncio.create_task(_push_transcript())
 
     # ── Periodic Live Sync (every 5 seconds) ──
@@ -470,7 +504,9 @@ async def studybuddyai_agent(ctx: agents.JobContext):
                     extracted_data=extracted,
                     sentiment_log=sentiment_entries,
                 )
-                logger.info(f"Live sync: pushed {len(transcript)} msgs, {len(extracted)} fields")
+                logger.info(
+                    f"Live sync: pushed {len(transcript)} msgs, {len(extracted)} fields"
+                )
             except asyncio.CancelledError:
                 break
             except Exception as e:
@@ -488,8 +524,14 @@ async def studybuddyai_agent(ctx: agents.JobContext):
         sync_task.cancel()
 
         agent = _agent_instance
-        if agent and getattr(agent, "_conversation_id", None) and getattr(agent, "_transcript", None):
-            logger.info(f"Session ended — running post-call pipeline for {agent._conversation_id}")
+        if (
+            agent
+            and getattr(agent, "_conversation_id", None)
+            and getattr(agent, "_transcript", None)
+        ):
+            logger.info(
+                f"Session ended — running post-call pipeline for {agent._conversation_id}"
+            )
             try:
                 await run_post_call_pipeline(
                     conversation_id=agent._conversation_id,
