@@ -596,27 +596,31 @@ async def studybuddyai_agent(ctx: agents.JobContext):
 
     # ── Data Pipeline: Register disconnect handler ──
     @ctx.room.on("disconnected")
-    async def on_room_disconnected():
+    def on_room_disconnected():
         """Run the full post-call pipeline when the room disconnects."""
         agent = _agent_instance
-        if agent and agent._conversation_id and agent._transcript:
-            logger.info(f"Room disconnected — running post-call pipeline for {agent._conversation_id}")
-            try:
-                await run_post_call_pipeline(
-                    conversation_id=agent._conversation_id,
-                    transcript=agent._transcript,
-                    started_at=agent._session_started_at,
+
+        async def _run_pipeline():
+            if agent and agent._conversation_id and agent._transcript:
+                logger.info(f"Room disconnected — running post-call pipeline for {agent._conversation_id}")
+                try:
+                    await run_post_call_pipeline(
+                        conversation_id=agent._conversation_id,
+                        transcript=agent._transcript,
+                        started_at=agent._session_started_at,
+                    )
+                except Exception as e:
+                    logger.error(f"Post-call pipeline failed: {e}")
+            elif agent and agent._conversation_id:
+                # Mark as completed even if no transcript
+                await update_conversation(
+                    agent._conversation_id,
+                    status="completed",
+                    ended_at=datetime.now(timezone.utc).isoformat(),
                 )
-            except Exception as e:
-                logger.error(f"Post-call pipeline failed: {e}")
-        elif agent and agent._conversation_id:
-            # Mark as completed even if no transcript
-            await update_conversation(
-                agent._conversation_id,
-                status="completed",
-                ended_at=datetime.now(timezone.utc).isoformat(),
-            )
-            logger.info("Room disconnected with empty transcript — marked as completed")
+                logger.info("Room disconnected with empty transcript — marked as completed")
+                
+        asyncio.create_task(_run_pipeline())
 
     # Generate an initial greeting
     await session.generate_reply(
