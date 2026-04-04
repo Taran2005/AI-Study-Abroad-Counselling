@@ -524,28 +524,32 @@ async def studybuddyai_agent(ctx: agents.JobContext):
         sync_task.cancel()
 
         agent = _agent_instance
-        if (
-            agent
-            and getattr(agent, "_conversation_id", None)
-            and getattr(agent, "_transcript", None)
-        ):
+        conversation_id = getattr(agent, "_conversation_id", None)
+
+        if not conversation_id:
+            logger.warning("No conversation ID found — cannot update status")
+            return
+
+        # Always mark as completed first (in case pipeline fails)
+        await update_conversation(
+            conversation_id,
+            status="completed",
+            ended_at=datetime.now(timezone.utc).isoformat(),
+        )
+
+        if agent and getattr(agent, "_transcript", None):
             logger.info(
-                f"Session ended — running post-call pipeline for {agent._conversation_id}"
+                f"Session ended — running post-call pipeline for {conversation_id}"
             )
             try:
                 await run_post_call_pipeline(
-                    conversation_id=agent._conversation_id,
+                    conversation_id=conversation_id,
                     transcript=agent._transcript,
                     started_at=getattr(agent, "_session_started_at", None),
                 )
             except Exception as e:
                 logger.error(f"Post-call pipeline failed: {e}")
-        elif agent and getattr(agent, "_conversation_id", None):
-            await update_conversation(
-                agent._conversation_id,
-                status="completed",
-                ended_at=datetime.now(timezone.utc).isoformat(),
-            )
+        else:
             logger.info("Session ended with empty transcript — marked as completed")
 
     # ── Session Close: Primary handler ──
