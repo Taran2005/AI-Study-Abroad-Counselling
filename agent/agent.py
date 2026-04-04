@@ -2,11 +2,12 @@
 StudyBuddyAI AI Voice Agent
 ========================
 A LiveKit voice agent for overseas education counselling using:
-- STT: Deepgram Nova-3 (via LiveKit Inference)
+- STT: Google Cloud Speech-to-Text (multilingual: Hindi, English, Marathi, Gujarati)
 - LLM: OpenAI GPT-4o (via OpenAI plugin - Responses API)
-- TTS: ElevenLabs Multilingual v2 (via LiveKit Inference)
+- TTS: Google Cloud Text-to-Speech (Gemini TTS)
 - Avatar: Anam (lifelike avatar video)
 - Vision: Video frame sampling from user's camera/screen share
+- Fallback: Deepgram STT + OpenAI TTS when Google creds are not configured
 """
 
 import asyncio
@@ -43,7 +44,7 @@ from livekit.agents import (
 )
 from livekit.agents.llm import ImageContent
 from livekit.agents.voice.events import ConversationItemAddedEvent, CloseEvent
-from livekit.plugins import openai, anam, silero, deepgram, elevenlabs
+from livekit.plugins import openai, anam, silero, deepgram, elevenlabs, google
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 load_dotenv(".env.local")
@@ -59,6 +60,44 @@ logger.addHandler(fh)
 # Load knowledge base for system prompt injection
 _kb_path = Path(__file__).parent / "knowledge_base.txt"
 _knowledge_base = _kb_path.read_text(encoding="utf-8") if _kb_path.exists() else ""
+
+
+def _build_google_credentials() -> dict | None:
+    """
+    Build a Google Cloud service account credentials dict from individual
+    environment variables. Returns None if required vars are missing.
+    """
+    project_id = os.getenv("GOOGLE_PROJECT_ID")
+    private_key = os.getenv("GOOGLE_PRIVATE_KEY")
+    client_email = os.getenv("GOOGLE_CLIENT_EMAIL")
+
+    if not all([project_id, private_key, client_email]):
+        logger.info("Google Cloud credentials not configured — will use Deepgram/OpenAI fallback")
+        return None
+
+    # CRITICAL: .env loaders often store \n as literal backslash-n.
+    # The Google client library needs actual newline characters in the PEM key.
+    normalized_key = private_key.replace("\\n", "\n")
+
+    creds = {
+        "type": "service_account",
+        "project_id": project_id,
+        "private_key_id": os.getenv("GOOGLE_PRIVATE_KEY_ID", ""),
+        "private_key": normalized_key,
+        "client_email": client_email,
+        "client_id": os.getenv("GOOGLE_CLIENT_ID", ""),
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email.replace('@', '%40')}",
+        "universe_domain": "googleapis.com",
+    }
+    logger.info(f"Google Cloud credentials loaded for project: {project_id}")
+    return creds
+
+
+# Pre-build credentials once at module load
+_google_creds = _build_google_credentials()
 
 
 class LunaAssistant(Agent):
@@ -354,9 +393,12 @@ class LunaAssistant(Agent):
         super().__init__(
             instructions=(
                 "# IDENTITY\n"
-                "You are **StudyBuddyAI AI**, a warm, professional, and highly knowledgeable overseas education counsellor. "
+                "You are **StudyBuddyAI AI**, a warm, friendly, female overseas education counsellor. "
                 "You work for StudyBuddyAI, a consultancy that has helped 45,000+ students get admitted to 120+ partner universities in the UK and Ireland. "
-                "You speak naturally, with empathy and encouragement. You sound like a real human counsellor, not a robot.\n\n"
+                "You speak naturally, with empathy and encouragement. You sound like a real human counsellor, not a robot.\n"
+                "CRITICAL INSTRUCTION ON LANGUAGE: You are fully multilingual and fluent in English, Hindi, Gujarati, Marathi, and Punjabi. "
+                "If the student speaks to you in Hindi, Gujarati, Marathi, or Punjabi, YOU MUST RESPOND IN THAT EXACT LANGUAGE. "
+                "Never apologize or say you cannot speak a language. You are fully capable of speaking these languages natively.\n\n"
 
                 "# VOICE & TONE\n"
                 "- Speak in short, clear sentences (you are a VOICE agent — the student is LISTENING, not reading).\n"
@@ -422,6 +464,16 @@ class LunaAssistant(Agent):
                 "- Only ask about missing or outdated data points.\n"
                 "- If the student says they are new, skip this tool entirely.\n\n"
 
+                "# VISION CAPABILITIES\n"
+                "You have access to the student's camera and screen share when they enable it.\n"
+                "- When an image is attached to a user's message, it means their camera or screen share is active.\n"
+                "- ALWAYS acknowledge what you see in the image naturally within the conversation context.\n"
+                "- If you see a document, marksheet, score card, or transcript, read the relevant details out loud "
+                "(name, grades/scores, institution, dates) and confirm them with the student.\n"
+                "- If you see a screen with a university website, comment on what you see and offer relevant guidance.\n"
+                "- If the image is just a webcam feed of the student, you do NOT need to describe their appearance. "
+                "Only mention visual context if it's academically relevant (e.g. they are showing a document).\n"
+                "- Example: 'I can see your marksheet. It looks like you scored 85% in your 12th standard — that's excellent!'\n\n"
                 "# IMPORTANT RULES\n"
                 "- Ask ONLY ONE question per turn. Wait for the answer.\n"
                 "- If the student gives short answers ('yes', 'no', 'UK'), acknowledge and move to the next question.\n"
@@ -556,10 +608,30 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     room_name = ctx.room.name
     logger.info(f"Starting StudyBuddyAI session in room: {room_name}")
 
+    # Build STT and TTS — use Google Cloud if credentials are available, else fallback
+    if _google_creds:
+        logger.info("Using Google Cloud STT + TTS (multilingual)")
+        agent_stt = google.STT(
+            languages=["hi-IN", "en-US", "mr-IN", "gu-IN", "pa-IN"],
+            detect_language=True,
+            model="latest_long",
+            credentials_info=_google_creds,
+        )
+        agent_tts = google.TTS(
+            language="en-US",
+            voice_name="Aoede",
+            model_name="gemini-2.5-flash-tts",
+            credentials_info=_google_creds,
+        )
+    else:
+        logger.info("Using Deepgram STT + OpenAI TTS (fallback)")
+        agent_stt = deepgram.STT(model="nova-3", language="hi")
+        agent_tts = openai.TTS(voice="alloy")
+
     session = AgentSession(
-        stt=deepgram.STT(model="nova-3", language="hi"),
+        stt=agent_stt,
         llm=openai.responses.LLM(model="gpt-4o"),
-        tts=openai.TTS(voice="alloy"),
+        tts=agent_tts,
         vad=silero.VAD.load(),
         turn_handling=TurnHandlingOptions(turn_detection=MultilingualModel()),
     )
@@ -572,8 +644,9 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     )
 
     # Start the agent session with the user, using custom text input handler for vision
+    # NOTE: Do NOT call on_enter() manually — session.start() triggers it automatically
+    # via the Agent lifecycle. Manual call would double-register event handlers.
     _agent_instance = LunaAssistant()
-    await _agent_instance.on_enter()
     await session.start(
         room=ctx.room,
         agent=_agent_instance,
