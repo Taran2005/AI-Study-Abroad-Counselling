@@ -14,10 +14,12 @@ import {
 	GraduationCap,
 	Menu,
 	ChevronLeft,
+	PhoneOutgoing,
 } from "lucide-react";
 
 const sidebarLinks = [
 	{ label: "Analytics", href: "/admin", icon: BarChart3 },
+	{ label: "Outbound Calls", href: "/admin/outbound", icon: PhoneOutgoing },
 	{ label: "Knowledge Base", href: "/admin/knowledge", icon: BookOpen },
 	{ label: "Counsellors", href: "/admin/counsellors", icon: UsersRound },
 	{ label: "Settings", href: "/admin/settings", icon: Settings },

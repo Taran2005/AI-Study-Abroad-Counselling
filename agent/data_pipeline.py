@@ -577,6 +577,42 @@ async def run_post_call_pipeline(
         print(f"[WEBHOOK] ❌ Failed to fire call-ended webhook: {e}")
         logger.error(f"Call-ended webhook failed: {e}")
 
+    # 9. Auto-trigger outbound follow-up call for hot leads via Bolna AI
+    if (
+        student_phone
+        and total_score >= 70
+        and os.getenv("AUTO_OUTBOUND_ENABLED", "false").lower() == "true"
+    ):
+        try:
+            api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+            webhook_secret = os.getenv("WEBHOOK_SECRET", "")
+            print(
+                f"[OUTBOUND] Triggering follow-up call for {student_name} ({student_phone}) | score={total_score:.0f}"
+            )
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    f"{api_base}/api/outbound-calls",
+                    headers={"x-webhook-secret": webhook_secret},
+                    json={
+                        "phone": student_phone,
+                        "student_name": student_name or "Student",
+                        "conversation_id": conversation_id,
+                        "call_type": "follow_up",
+                        "triggered_by": "system",
+                        "context": extracted_data,
+                    },
+                )
+                print(
+                    f"[OUTBOUND] Server responded: {resp.status_code} {resp.text[:200]}"
+                )
+        except Exception as e:
+            print(f"[OUTBOUND] ❌ Outbound call trigger failed: {e}")
+            logger.error(f"Outbound call trigger failed: {e}")
+    elif student_phone and total_score >= 70:
+        logger.info(
+            f"Outbound auto-trigger disabled (AUTO_OUTBOUND_ENABLED != true)"
+        )
+
     logger.info(
         f"Post-call pipeline complete for {conversation_id}. "
         f"Extracted {len(extracted_data)} data points. "

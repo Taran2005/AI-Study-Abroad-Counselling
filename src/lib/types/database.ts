@@ -241,3 +241,55 @@ export interface Report {
   status: ReportStatus;
   created_at: string;
 }
+
+// ── Outbound Calls (Bolna AI) ──
+
+export type OutboundCallType =
+  | "follow_up"
+  | "appointment_confirm"
+  | "re_engage";
+
+export type OutboundCallStatus =
+  | "queued"
+  | "in-progress"
+  | "completed"
+  | "failed"
+  | "no_answer";
+
+export type OutboundCallOutcome =
+  | "interested"
+  | "callback_requested"
+  | "not_interested"
+  | "voicemail"
+  | "no_answer";
+
+export interface OutboundCall {
+  id: string;
+  conversation_id: string | null;
+  bolna_execution_id: string | null;
+  bolna_agent_id: string | null;
+  student_name: string | null;
+  student_phone: string;
+  student_email: string | null;
+  call_type: OutboundCallType;
+  call_status: OutboundCallStatus;
+  call_outcome: OutboundCallOutcome | null;
+  initiated_at: string;
+  answered_at: string | null;
+  ended_at: string | null;
+  duration_secs: number;
+  transcript: string | null;
+  extracted_data: Record<string, unknown>;
+  call_summary: string | null;
+  recording_url: string | null;
+  user_data: Record<string, unknown>;
+  triggered_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OutboundCallInsert = Omit<
+  OutboundCall,
+  "id" | "created_at" | "updated_at"
+> &
+  Partial<Pick<OutboundCall, "id" | "created_at" | "updated_at">>;
