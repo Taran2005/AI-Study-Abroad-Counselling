@@ -502,6 +502,23 @@ async def run_post_call_pipeline(
     else:
         logger.info("Skipping WhatsApp — no phone number extracted")
 
+    # 5. Trigger Next.js chain reaction (Slack alert + study plan email)
+    next_url = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{next_url}/api/webhook/call-ended",
+                json={
+                    "conversation_id": conversation_id,
+                    "total_score": round(total_score, 1),
+                    "extracted_data": extracted_data,
+                    "score_result": score_result,
+                },
+            )
+        logger.info(f"Chain reaction triggered for {conversation_id} (score: {total_score:.0f})")
+    except Exception as e:
+        logger.warning(f"Chain reaction trigger failed (non-blocking): {e}")
+
     logger.info(
         f"Post-call pipeline complete for {conversation_id}. "
         f"Extracted {len(extracted_data)} data points. "
