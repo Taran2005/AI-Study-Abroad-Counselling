@@ -12,6 +12,7 @@ A LiveKit voice agent for overseas education counselling using:
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 import os
 import smtplib
 from email.mime.text import MIMEText
@@ -20,6 +21,13 @@ from pathlib import Path
 
 import httpx
 from dotenv import load_dotenv
+
+from data_pipeline import (
+    create_conversation,
+    update_conversation,
+    extract_student_data,
+    run_post_call_pipeline,
+)
 
 from livekit import agents, rtc
 from livekit.agents import (
@@ -198,7 +206,7 @@ Instead, ask for their full name, email address, and preferred date/time so you 
 
 
 class StudyBuddyAIAssistant(Agent):
-    """StudyBuddyAI AI assistant persona with vision and RAG capabilities."""
+    """StudyBuddyAI AI assistant persona with vision, RAG, and data pipeline capabilities."""
 
     @llm.function_tool(description="Book a consultation appointment with a human counsellor. Call this when the user explicitly agrees to book a time and provides their details.")
     async def book_consultation(
@@ -227,6 +235,14 @@ class StudyBuddyAIAssistant(Agent):
         self._camera_stream = None
         self._screen_stream = None
         self._tasks: list = []
+
+        # ── Data Pipeline State ──
+        self._conversation_id: str | None = None
+        self._transcript: list[dict] = []
+        self._extracted_data: dict = {}
+        self._session_started_at: datetime = datetime.now(timezone.utc)
+        self._user_turn_count: int = 0
+        self._extraction_interval: int = 4  # Run extraction every N user turns
 
         # Build the initial system prompt with the static knowledge base as baseline
         instructions = (
@@ -285,9 +301,9 @@ class StudyBuddyAIAssistant(Agent):
     ) -> None:
         """
         Inject the latest video frame AND RAG context into the user's message before sending to LLM.
+        Also accumulates the transcript and triggers periodic background extraction.
         """
-        # --- RAG Injection ---
-        # Extract the user's text to use as a RAG query
+        # --- Transcript Accumulation ---
         user_text = ""
         if isinstance(new_message.content, str):
             user_text = new_message.content
@@ -297,9 +313,27 @@ class StudyBuddyAIAssistant(Agent):
             )
 
         if user_text:
+            self._transcript.append({
+                "role": "user",
+                "text": user_text,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            self._user_turn_count += 1
+            logger.debug(f"Transcript now has {len(self._transcript)} entries (user turn #{self._user_turn_count})")
+
+        # --- Periodic Background Extraction ---
+        if (
+            self._user_turn_count > 0
+            and self._user_turn_count % self._extraction_interval == 0
+            and self._conversation_id
+        ):
+            # Fire and forget — do NOT block the conversation
+            asyncio.create_task(self._run_background_extraction())
+
+        # --- RAG Injection ---
+        if user_text:
             rag_context = await query_knowledge_base(user_text, top_k=3)
             if rag_context and rag_context != _knowledge_base:
-                # Inject the RAG context as a system message in the chat context
                 context_msg = ChatMessage(
                     role="system",
                     content=(
@@ -318,12 +352,44 @@ class StudyBuddyAIAssistant(Agent):
             if isinstance(new_message.content, str):
                 new_message.content = [new_message.content]
             new_message.content.append(ImageContent(image=frame))
-            
-            # Clear frames after sending to avoid duplicates
             self._latest_camera_frame = None
             self._latest_screen_frame = None
         else:
             logger.debug("No video frame available for this voice turn")
+
+    def on_agent_speech_committed(self, text: str) -> None:
+        """
+        Called when the agent finishes speaking a complete response.
+        Accumulate the agent's turns into the transcript.
+        """
+        self._transcript.append({
+            "role": "agent",
+            "text": text,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        logger.debug(f"Agent turn recorded. Transcript: {len(self._transcript)} entries")
+
+    async def _run_background_extraction(self) -> None:
+        """
+        Run data extraction in the background without blocking the conversation.
+        Updates the conversation record with the latest extracted data.
+        """
+        try:
+            logger.info(f"Running background extraction (turn #{self._user_turn_count})")
+            new_data = await extract_student_data(self._transcript)
+            if new_data:
+                # Merge with existing data (new data takes precedence)
+                self._extracted_data = {**self._extracted_data, **new_data}
+                # Save to database
+                if self._conversation_id:
+                    await update_conversation(
+                        self._conversation_id,
+                        transcript=self._transcript,
+                        extracted_data=self._extracted_data,
+                    )
+                logger.info(f"Background extraction complete: {len(self._extracted_data)} total data points")
+        except Exception as e:
+            logger.error(f"Background extraction failed: {e}")
 
     def _create_video_stream(self, track: rtc.Track, is_screen_share: bool = False):
         """Opens a VideoStream on the given track and continuously buffers the latest frame."""
@@ -405,6 +471,9 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     """Entry point for the StudyBuddyAI voice agent session."""
     global _agent_instance
 
+    room_name = ctx.room.name
+    logger.info(f"Starting StudyBuddyAI session in room: {room_name}")
+
     # Create the voice pipeline session
     session = AgentSession(
         stt=deepgram.STT(
@@ -435,6 +504,16 @@ async def studybuddyai_agent(ctx: agents.JobContext):
 
     # Start the agent session with the user, using custom text input handler for vision
     _agent_instance = StudyBuddyAIAssistant()
+
+    # ── Data Pipeline: Create conversation record ──
+    conversation_id = await create_conversation(room_name)
+    if conversation_id:
+        _agent_instance._conversation_id = conversation_id
+        _agent_instance._session_started_at = datetime.now(timezone.utc)
+        logger.info(f"Linked conversation {conversation_id} to agent instance")
+    else:
+        logger.warning("Failed to create conversation record — pipeline will be limited")
+
     await session.start(
         room=ctx.room,
         agent=_agent_instance,
@@ -444,6 +523,30 @@ async def studybuddyai_agent(ctx: agents.JobContext):
             ),
         ),
     )
+
+    # ── Data Pipeline: Register disconnect handler ──
+    @ctx.room.on("disconnected")
+    async def on_room_disconnected():
+        """Run the full post-call pipeline when the room disconnects."""
+        agent = _agent_instance
+        if agent and agent._conversation_id and agent._transcript:
+            logger.info(f"Room disconnected — running post-call pipeline for {agent._conversation_id}")
+            try:
+                await run_post_call_pipeline(
+                    conversation_id=agent._conversation_id,
+                    transcript=agent._transcript,
+                    started_at=agent._session_started_at,
+                )
+            except Exception as e:
+                logger.error(f"Post-call pipeline failed: {e}")
+        elif agent and agent._conversation_id:
+            # Mark as completed even if no transcript
+            await update_conversation(
+                agent._conversation_id,
+                status="completed",
+                ended_at=datetime.now(timezone.utc).isoformat(),
+            )
+            logger.info("Room disconnected with empty transcript — marked as completed")
 
     # Generate an initial greeting
     await session.generate_reply(

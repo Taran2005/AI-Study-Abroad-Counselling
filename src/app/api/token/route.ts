@@ -1,11 +1,12 @@
 import { AccessToken, AgentDispatchClient } from "livekit-server-sdk";
 import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
 /**
  * POST /api/token
  *
- * Generates a LiveKit access token for the client and dispatches
- * the StudyBuddyAI agent into the room.
+ * Generates a LiveKit access token for the client, creates a conversation
+ * record in Supabase, and dispatches the StudyBuddyAI agent into the room.
  */
 export async function POST(request: Request) {
 	try {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
 		const dispatchClient = new AgentDispatchClient(livekitUrl, apiKey, apiSecret);
 		await dispatchClient.createDispatch(roomName, "studybuddyai-agent");
 
-		return NextResponse.json({ token: jwt });
+		return NextResponse.json({ token: jwt, roomName });
 	} catch (error) {
 		console.error("Token/dispatch error:", error);
 		return NextResponse.json(
