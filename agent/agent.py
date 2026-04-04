@@ -229,6 +229,76 @@ class StudyBuddyAIAssistant(Agent):
         await asyncio.to_thread(send_confirmation_email, user_email, user_name, date, time)
         return "Booking successful! The confirmation email has been sent."
 
+    @llm.function_tool(description="Search for university recommendations based on the student's profile and preferences. Call this when the student wants to know which universities would be a good fit, or when you have enough profile data to suggest options.")
+    async def search_universities(
+        self,
+        query: str,
+        country: str = "",
+    ):
+        """
+        Search for matching universities using vector similarity.
+
+        Args:
+            query: A natural language description of what the student is looking for, including their field of study, budget, test scores, and preferences.
+            country: Optional filter — 'UK' or 'Ireland'. Leave empty for both.
+        """
+        logger.info(f"Searching universities: query='{query}', country='{country}'")
+        
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+
+        try:
+            payload: dict = {"query": query, "maxResults": 3}
+            if country:
+                payload["country"] = country
+
+            async with httpx.AsyncClient(timeout=12.0) as client:
+                resp = await client.post(
+                    f"{api_base}/api/universities/search",
+                    json=payload,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+
+            universities = data.get("universities", [])
+
+            if not universities:
+                return "I couldn't find matching universities in our database at the moment. Let me share some general recommendations based on my knowledge instead."
+
+            # Format results for the LLM to speak naturally
+            results = []
+            for i, uni in enumerate(universities, 1):
+                parts = [f"{i}. {uni.get('name', 'Unknown')}"]
+                if uni.get("city"):
+                    parts.append(f"   Location: {uni['city']}, {uni.get('country', '')}")
+                if uni.get("ranking"):
+                    parts.append(f"   Ranking: #{uni['ranking']}")
+                
+                # Costs
+                costs = uni.get("costs", {})
+                if costs.get("tuition_min") or costs.get("tuition_max"):
+                    currency = costs.get("currency", "GBP")
+                    parts.append(f"   Tuition: {currency} {costs.get('tuition_min', 'N/A')} - {costs.get('tuition_max', 'N/A')}")
+
+                # Requirements
+                reqs = uni.get("requirements", {})
+                if reqs.get("ielts_min"):
+                    parts.append(f"   IELTS Minimum: {reqs['ielts_min']}")
+
+                # Scholarships
+                scholarships = uni.get("scholarships", [])
+                if scholarships:
+                    names = [s.get("name", "") for s in scholarships[:2] if s.get("name")]
+                    if names:
+                        parts.append(f"   Scholarships: {', '.join(names)}")
+
+                results.append("\n".join(parts))
+
+            return "Here are the top university matches:\n\n" + "\n\n".join(results)
+
+        except Exception as e:
+            logger.error(f"University search failed: {e}")
+            return "I'm having trouble searching our university database right now. Let me share recommendations based on my general knowledge instead."
+
     def __init__(self) -> None:
         self._latest_camera_frame = None
         self._latest_screen_frame = None

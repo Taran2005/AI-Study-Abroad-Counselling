@@ -7,7 +7,7 @@ import type { LucideIcon } from "lucide-react";
 interface StatCardProps {
 	icon: LucideIcon;
 	label: string;
-	value: number;
+	value: number | string;
 	suffix?: string;
 	prefix?: string;
 	change?: number; // percentage change
@@ -27,19 +27,26 @@ export default function StatCard({
 	change,
 	className = "",
 }: StatCardProps) {
-	const [displayValue, setDisplayValue] = useState(0);
+	const isNumeric = typeof value === "number";
+	const [displayValue, setDisplayValue] = useState(isNumeric ? 0 : value);
 
 	useEffect(() => {
+		if (!isNumeric) {
+			setDisplayValue(value);
+			return;
+		}
+
+		const numVal = value as number;
 		const duration = 1200;
 		const steps = 40;
 		const stepTime = duration / steps;
 		let current = 0;
-		const increment = value / steps;
+		const increment = numVal / steps;
 
 		const timer = setInterval(() => {
 			current += increment;
-			if (current >= value) {
-				setDisplayValue(value);
+			if (current >= numVal) {
+				setDisplayValue(numVal);
 				clearInterval(timer);
 			} else {
 				setDisplayValue(Math.floor(current));
@@ -47,7 +54,11 @@ export default function StatCard({
 		}, stepTime);
 
 		return () => clearInterval(timer);
-	}, [value]);
+	}, [value, isNumeric]);
+
+	const formattedValue = typeof displayValue === "number"
+		? displayValue.toLocaleString()
+		: displayValue;
 
 	return (
 		<Card
@@ -60,7 +71,7 @@ export default function StatCard({
 				<div className="flex flex-col gap-0.5 min-w-0">
 					<div className="text-2xl font-bold text-foreground tracking-tight">
 						{prefix}
-						{displayValue.toLocaleString()}
+						{formattedValue}
 						{suffix}
 					</div>
 					<div className="text-sm text-muted-foreground font-medium truncate">
