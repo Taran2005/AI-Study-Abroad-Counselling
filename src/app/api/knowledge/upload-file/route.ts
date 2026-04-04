@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { chunkText, generateEmbeddings } from "@/lib/embeddings";
+import { extractText } from "unpdf";
 
 /**
  * POST /api/knowledge/upload-file
@@ -35,9 +36,27 @@ export async function POST(request: Request) {
 
 		// Extract text from the file
 		if (fileType === "application/pdf" || fileName.toLowerCase().endsWith(".pdf")) {
-			// For PDFs, extract raw text (basic extraction)
 			const buffer = await file.arrayBuffer();
-			textContent = await extractTextFromPdf(Buffer.from(buffer));
+			const result = await extractText(new Uint8Array(buffer));
+			console.log("unpdf result keys:", Object.keys(result));
+			console.log("unpdf text type:", typeof result.text, Array.isArray(result.text));
+
+			if (Array.isArray(result.text)) {
+				textContent = result.text.join("\n");
+			} else if (typeof result.text === "string") {
+				textContent = result.text;
+			} else if (result.text) {
+				textContent = String(result.text);
+			}
+
+			// Fallback: check if there are "pages" or other properties
+			if (!textContent && typeof result === "object") {
+				const allValues = Object.values(result)
+					.flat()
+					.filter((v) => typeof v === "string")
+					.join("\n");
+				if (allValues) textContent = allValues;
+			}
 		} else if (
 			fileType === "text/plain" ||
 			fileType === "text/markdown" ||
@@ -50,6 +69,11 @@ export async function POST(request: Request) {
 				{ error: `Unsupported file type: ${fileType}. Supported: .pdf, .txt, .md` },
 				{ status: 400 },
 			);
+		}
+
+		// Safety: ensure textContent is always a string
+		if (typeof textContent !== "string") {
+			textContent = String(textContent ?? "");
 		}
 
 		if (!textContent.trim()) {
@@ -126,57 +150,4 @@ export async function POST(request: Request) {
 			{ status: 500 },
 		);
 	}
-}
-
-/**
- * Basic PDF text extraction.
- * Scans the raw PDF binary for text streams and extracts readable content.
- * Works for most text-based PDFs (not scanned images).
- */
-async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-	const text = buffer.toString("latin1");
-	const textParts: string[] = [];
-
-	// Extract text between BT (Begin Text) and ET (End Text) operators
-	const btEtRegex = /BT\s([\s\S]*?)ET/g;
-	let match: RegExpExecArray | null;
-
-	while ((match = btEtRegex.exec(text)) !== null) {
-		const block = match[1];
-		// Extract text from Tj, TJ, ' and " operators
-		const tjRegex = /\(([^)]*)\)\s*(?:Tj|'|")/g;
-		let tjMatch: RegExpExecArray | null;
-		while ((tjMatch = tjRegex.exec(block)) !== null) {
-			textParts.push(tjMatch[1]);
-		}
-
-		// Handle TJ arrays: [(text1) 123 (text2)] TJ
-		const tjArrayRegex = /\[(.*?)\]\s*TJ/g;
-		let arrMatch: RegExpExecArray | null;
-		while ((arrMatch = tjArrayRegex.exec(block)) !== null) {
-			const innerRegex = /\(([^)]*)\)/g;
-			let innerMatch: RegExpExecArray | null;
-			while ((innerMatch = innerRegex.exec(arrMatch[1])) !== null) {
-				textParts.push(innerMatch[1]);
-			}
-		}
-	}
-
-	// Decode common PDF escape sequences  
-	let decoded = textParts.join(" ")
-		.replace(/\\n/g, "\n")
-		.replace(/\\r/g, "\r")
-		.replace(/\\t/g, "\t")
-		.replace(/\\\(/g, "(")
-		.replace(/\\\)/g, ")")
-		.replace(/\\\\/g, "\\");
-
-	// Clean up excessive whitespace
-	decoded = decoded
-		.split("\n")
-		.map(line => line.trim())
-		.filter(line => line.length > 0)
-		.join("\n");
-
-	return decoded;
 }
