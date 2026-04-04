@@ -69,8 +69,8 @@ def send_confirmation_email(to_email: str, user_name: str, date: str, time: str)
 
     try:
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Your ReeLabs Stem Cell Consultation is Confirmed!"
-        msg["From"] = f"ReeLabs Concierge <{sender_email}>"
+        msg["Subject"] = "Your StudyBuddyAI AI Overseas Education Consultation is Confirmed!"
+        msg["From"] = f"StudyBuddyAI Counsellor <{sender_email}>"
         msg["To"] = to_email
 
         html_content = f"""
@@ -82,7 +82,7 @@ def send_confirmation_email(to_email: str, user_name: str, date: str, time: str)
               </div>
               <div style="padding: 20px;">
                 <p>Hello {user_name},</p>
-                <p>Thank you for reaching out to ReeLabs. I'm thrilled to confirm your dedicated stem cell consultation.</p>
+                <p>Thank you for reaching out to StudyBuddyAI. I'm thrilled to confirm your dedicated university admissions consultation.</p>
                 <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
                   <tr>
                     <td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Date:</strong></td>
@@ -93,8 +93,8 @@ def send_confirmation_email(to_email: str, user_name: str, date: str, time: str)
                     <td style="padding: 10px; border-bottom: 1px solid #eee;">{time}</td>
                   </tr>
                 </table>
-                <p style="margin-top: 30px;">An expert consultant will join you at the scheduled time to discuss our 10 sources of stem cell banking and therapy options.</p>
-                <p>Warmest regards,<br><strong>Luna (Virtual Consultant)</strong><br>ReeLabs</p>
+                <p style="margin-top: 30px;">An expert overseas education counsellor will join you at the scheduled time to discuss your study abroad plans.</p>
+                <p>Warmest regards,<br><strong>Luna (Virtual Counsellor)</strong><br>StudyBuddyAI</p>
               </div>
             </div>
           </body>
@@ -205,6 +205,49 @@ class LunaAssistant(Agent):
             logger.error(f"University search failed: {e}")
             return "I'm having trouble searching our university database right now. Let me share recommendations based on my general knowledge instead."
 
+    @llm.function_tool(description="Search the internal PDF knowledge base for specific information, policies, visa rules, procedures, or facts that are not about searching for universities.")
+    async def search_knowledge_base(
+        self,
+        query: str,
+    ):
+        """
+        Query the PDF vector database for precise information.
+        
+        Args:
+            query: The specific question or topic to search for in the PDFs.
+        """
+        logger.info(f"Searching knowledge base for: query='{query}'")
+        
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    f"{api_base}/api/knowledge/query",
+                    json={"query": query, "topK": 3},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+
+            results = data.get("results", [])
+
+            if not results:
+                return "I couldn't find any specific information about that in the knowledge base documents. Try answering generally or ask the user to clarify."
+
+            # Format results
+            formatted_chunks = []
+            for i, res in enumerate(results, 1):
+                doc_title = res.get("doc_title", "Unknown Document")
+                content = res.get("content", "").strip()
+                formatted_chunks.append(f"--- From Document: {doc_title} ---\n{content}")
+
+            return "Here is the information from our internal documents:\n\n" + "\n\n".join(formatted_chunks)
+
+        except Exception as e:
+            logger.error(f"Knowledge base search failed: {e}")
+            return "The database is currently unreachable. Rely on your general knowledge to assist the user."
+
+
     def __init__(self) -> None:
         self._transcript: list[dict] = []
         self._conversation_id: str | None = None
@@ -216,32 +259,18 @@ class LunaAssistant(Agent):
         self._tasks: list = []
         super().__init__(
             instructions=(
-                "You are Luna, ReeLabs' virtual stem cell consultant. "
-                "You are warm, empathetic, and deeply knowledgeable about stem cell "
-                "banking, stem cell therapy, and the Golden Vial Anti-Ageing program. "
-                "You help expectant parents understand stem cell banking, guide patients "
-                "exploring therapy options, and answer questions about ReeLabs' services. "
-                "Your responses are concise and natural — avoid complex formatting, "
-                "emojis, asterisks, or other symbols. Speak clearly and helpfully. "
-                "CRITICAL: You must perfectly mirror the user's language and speaking style. "
-                "If the user speaks purely in English, reply purely in English. "
-                "If the user speaks purely in Hindi, reply purely in Hindi. "
-                "If the user speaks in 'Hinglish' (mixing Hindi and English words in the same sentence), "
-                "you MUST reply in entirely natural 'Hinglish'. Do not over-correct them to pure English. "
-                "Write all Hindi words in Romanized form (e.g., 'mujhe', 'aap', 'namaste') not in Devanagari script. "
-                "When you receive an image along with the user's message, describe "
-                "what you see or answer questions about it naturally. "
-                "Always cite specific ReeLabs stats (13 patents, 10 sources, 99% recovery rate, etc.) "
-                "when relevant to build trust. "
-                "If someone asks about scheduling a consultation or making an appointment, "
-                "do NOT redirect them to a phone number. Instead, you MUST ask for their full name, "
-                "email address, and preferred date/time so you can use your `book_consultation` tool to schedule it immediately."
+                "You are StudyBuddyAI AI, an expert overseas education counsellor. "
+                "Your job is to help students navigate studying abroad, specifically in the UK and Ireland. "
+                "You are friendly, empathetic, and highly knowledgeable about university admissions, IELTS/PTE preparation, "
+                "scholarships, visas, and living costs abroad. "
+                "Keep your responses naturally conversational, concise, and professional. Avoid long lists or markdown formatting. "
+                "CRITICAL INSTRUCTION: If a user asks to search, find, or recommend universities, you MUST immediately call the `search_universities` tool. Do not just list options from memory if they ask for a search.\n"
+                "CRITICAL INSTRUCTION: If a user asks about detailed procedures, visa policies, intricate document details, or anything specific not found in your standard memory, you MUST immediately call the `search_knowledge_base` tool to look it up in the PDF database."
                 "\n\n--- KNOWLEDGE BASE ---\n"
                 f"{_knowledge_base}"
             ),
         )
 
-        super().__init__(instructions=instructions)
 
     @property
     def latest_frame(self):
@@ -355,10 +384,7 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     session = AgentSession(
         stt=deepgram.STT(model="nova-3", language="hi"),
         llm=openai.responses.LLM(model="gpt-4o"),
-        tts=inference.TTS(
-            model="elevenlabs/eleven_multilingual_v2",
-            voice=os.getenv("ELEVENLABS_VOICE_ID", "pFZP5JQG7iQjIQuC4Bku"),
-        ),
+        tts=openai.TTS(voice="alloy"),
         vad=silero.VAD.load(),
         turn_handling=TurnHandlingOptions(turn_detection=MultilingualModel()),
     )
@@ -381,6 +407,32 @@ async def studybuddyai_agent(ctx: agents.JobContext):
             text_input=room_io.TextInputOptions(text_input_cb=vision_text_input_cb),
         ),
     )
+
+    # ── Data Pipeline: Register disconnect handler ──
+    @ctx.room.on("disconnected")
+    def on_room_disconnected():
+        """Run the full post-call pipeline when the room disconnects."""
+        async def run_pipeline():
+            agent = _agent_instance
+            if agent and getattr(agent, "_conversation_id", None) and getattr(agent, "_transcript", None):
+                logger.info(f"Room disconnected — running post-call pipeline for {agent._conversation_id}")
+                try:
+                    await run_post_call_pipeline(
+                        conversation_id=agent._conversation_id,
+                        transcript=agent._transcript,
+                        started_at=getattr(agent, "_session_started_at", None),
+                    )
+                except Exception as e:
+                    logger.error(f"Post-call pipeline failed: {e}")
+            elif agent and getattr(agent, "_conversation_id", None):
+                # Mark as completed even if no transcript
+                await update_conversation(
+                    agent._conversation_id,
+                    status="completed",
+                    ended_at=datetime.now(timezone.utc).isoformat(),
+                )
+                logger.info("Room disconnected with empty transcript — marked as completed")
+        asyncio.create_task(run_pipeline())
 
     # Generate an initial greeting
     await session.generate_reply(
