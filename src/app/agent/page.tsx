@@ -10,9 +10,18 @@ import {
 	useTranscriptions,
 } from "@livekit/components-react";
 import { ConnectionState, Track } from "livekit-client";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	Mic,
@@ -26,30 +35,59 @@ import {
 	CameraOff,
 	Monitor,
 	MonitorUp,
+	CheckCircle,
+	FileText,
+	ClipboardList,
+	Brain,
+	BarChart3,
+	GraduationCap,
+	AlertCircle,
 } from "lucide-react";
+
+/* ── Pipeline step definitions ── */
+const PIPELINE_STEPS = [
+	{ id: "extract", label: "Extracting student data", icon: ClipboardList },
+	{ id: "score", label: "Evaluating lead score", icon: BarChart3 },
+	{ id: "sentiment", label: "Analyzing sentiment", icon: Brain },
+	{ id: "report", label: "Generating report", icon: FileText },
+	{ id: "university", label: "Matching universities", icon: GraduationCap },
+] as const;
 
 export default function AgentPage() {
 	const [token, setToken] = useState<string>("");
+	const [roomName, setRoomName] = useState<string>("");
 	const [isConnecting, setIsConnecting] = useState(false);
 	const [isConnected, setIsConnected] = useState(false);
+
+	// Progress modal state
+	const [showProgress, setShowProgress] = useState(false);
+	const [currentStep, setCurrentStep] = useState(0);
+	const [reportReady, setReportReady] = useState(false);
+	const [reportFailed, setReportFailed] = useState(false);
+	const [reportId, setReportId] = useState<string | null>(null);
+	const [conversationId, setConversationId] = useState<string | null>(null);
+	const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const stepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+	const pollStartRef = useRef<number>(0);
 
 	const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
 
 	const handleConnect = useCallback(async () => {
 		setIsConnecting(true);
 		try {
-			const roomName = `studybuddyai-room-${Date.now()}`;
+			const newRoomName = `studybuddyai-room-${Date.now()}`;
 			const participantName = `user-${Math.random().toString(36).substring(2, 8)}`;
 
 			const response = await fetch("/api/token", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ roomName, participantName }),
+				body: JSON.stringify({ roomName: newRoomName, participantName }),
 			});
 
 			const data = await response.json();
 			if (data.token) {
 				setToken(data.token);
+				setRoomName(newRoomName);
 				setIsConnected(true);
 			}
 		} catch (error) {
@@ -62,7 +100,152 @@ export default function AgentPage() {
 	const handleDisconnect = useCallback(() => {
 		setToken("");
 		setIsConnected(false);
-	}, []);
+
+		// Show the progress modal
+		if (roomName) {
+			setShowProgress(true);
+			setCurrentStep(0);
+			setReportReady(false);
+			setReportFailed(false);
+			setReportId(null);
+			setConversationId(null);
+			pollStartRef.current = Date.now();
+		}
+	}, [roomName]);
+
+	// Animate through pipeline steps while waiting
+	useEffect(() => {
+		if (!showProgress || reportReady) {
+			if (stepTimerRef.current) clearInterval(stepTimerRef.current);
+			return;
+		}
+
+		// Animate steps: advance every 3 seconds until the second-to-last step
+		stepTimerRef.current = setInterval(() => {
+			setCurrentStep((prev) => {
+				if (prev < PIPELINE_STEPS.length - 1) return prev + 1;
+				return prev;
+			});
+		}, 3000);
+
+		return () => {
+			if (stepTimerRef.current) clearInterval(stepTimerRef.current);
+		};
+	}, [showProgress, reportReady]);
+
+	// Poll for conversation completion and report readiness
+	useEffect(() => {
+		if (!showProgress || !roomName || reportReady || reportFailed) return;
+
+		const TIMEOUT_MS = 90_000; // 90 seconds
+
+		const pollForReport = async () => {
+			try {
+				// Check timeout
+				if (Date.now() - pollStartRef.current > TIMEOUT_MS) {
+					setReportFailed(true);
+					setCurrentStep(PIPELINE_STEPS.length);
+					if (pollRef.current) {
+						clearInterval(pollRef.current);
+						pollRef.current = null;
+					}
+					return;
+				}
+
+				// Step 1: Find the conversation by room_name
+				let convoId = conversationId;
+				if (!convoId) {
+					const convoRes = await fetch(
+						`/api/conversations?room_name=${encodeURIComponent(roomName)}&limit=1`,
+					);
+					const convoData = await convoRes.json();
+					const convos = convoData.conversations || [];
+					if (convos.length > 0) {
+						convoId = convos[0].id;
+						setConversationId(convoId);
+					}
+				}
+
+				if (!convoId) return;
+
+				// Step 2: Check for report
+				const reportRes = await fetch(
+					`/api/reports?conversation_id=${convoId}&limit=1`,
+				);
+				const reportData = await reportRes.json();
+				const reports = reportData.reports || [];
+
+				if (reports.length > 0 && reports[0].status === "ready") {
+					setReportId(reports[0].id);
+					setReportReady(true);
+					setCurrentStep(PIPELINE_STEPS.length);
+					if (pollRef.current) {
+						clearInterval(pollRef.current);
+						pollRef.current = null;
+					}
+					return;
+				}
+
+				if (reports.length > 0 && reports[0].status === "failed") {
+					setReportFailed(true);
+					setCurrentStep(PIPELINE_STEPS.length);
+					if (pollRef.current) {
+						clearInterval(pollRef.current);
+						pollRef.current = null;
+					}
+					return;
+				}
+
+				// Step 3: Check if conversation is completed but no report (pipeline failed)
+				const convoDetailRes = await fetch(`/api/conversations?room_name=${encodeURIComponent(roomName)}&limit=1`);
+				const convoDetailData = await convoDetailRes.json();
+				const convoDetail = convoDetailData.conversations?.[0];
+				if (convoDetail?.status === "completed" && reports.length === 0) {
+					// Pipeline finished but report wasn't created — wait a bit more then fail
+					const elapsed = Date.now() - pollStartRef.current;
+					if (elapsed > 45_000) {
+						setReportFailed(true);
+						setCurrentStep(PIPELINE_STEPS.length);
+						if (pollRef.current) {
+							clearInterval(pollRef.current);
+							pollRef.current = null;
+						}
+					}
+				}
+			} catch (error) {
+				console.error("Report poll error:", error);
+			}
+		};
+
+		// Poll every 3 seconds
+		pollRef.current = setInterval(pollForReport, 3000);
+		// Also immediately check
+		pollForReport();
+
+		return () => {
+			if (pollRef.current) {
+				clearInterval(pollRef.current);
+				pollRef.current = null;
+			}
+		};
+	}, [showProgress, roomName, conversationId, reportReady, reportFailed]);
+
+	const handleCloseModal = () => {
+		setShowProgress(false);
+		setRoomName("");
+		setCurrentStep(0);
+		setReportReady(false);
+		setReportFailed(false);
+		setReportId(null);
+		setConversationId(null);
+	};
+
+	const progressPercent = reportReady || reportFailed
+		? 100
+		: Math.min(
+				((currentStep + 1) / PIPELINE_STEPS.length) * 90,
+				90,
+			);
 
 	if (!livekitUrl) {
 		return (
@@ -99,9 +282,126 @@ export default function AgentPage() {
 					<RoomAudioRenderer />
 				</LiveKitRoom>
 			)}
+
+			{/* ── Report Generation Progress Modal ── */}
+			<Dialog open={showProgress} onOpenChange={(open) => {
+				if (!open) handleCloseModal();
+			}}>
+				<DialogContent className="sm:max-w-md" showCloseButton={false}>
+					<DialogHeader>
+						<DialogTitle className="flex items-center gap-2">
+							{reportReady ? (
+								<>
+									<CheckCircle className="w-5 h-5 text-green-500" />
+									Report Ready!
+								</>
+							) : reportFailed ? (
+								<>
+									<AlertCircle className="w-5 h-5 text-yellow-500" />
+									Report Generation Timed Out
+								</>
+							) : (
+								<>
+									<Loader2 className="w-5 h-5 animate-spin text-primary" />
+									Generating Your Report
+								</>
+							)}
+						</DialogTitle>
+						<DialogDescription>
+							{reportReady
+								? "Your personalized counselling report has been generated successfully."
+								: reportFailed
+									? "The report is still being processed. You can check back later from the dashboard."
+									: "Please wait while we analyze your session and prepare your personalized report..."}
+						</DialogDescription>
+					</DialogHeader>
+
+					<div className="space-y-4 py-4">
+						{/* Progress Bar */}
+						<Progress value={progressPercent} className="h-2" />
+						<p className="text-xs text-muted-foreground text-right">
+							{reportReady ? "Complete" : `${Math.round(progressPercent)}%`}
+						</p>
+
+						{/* Pipeline Steps */}
+						<div className="space-y-3">
+							{PIPELINE_STEPS.map((step, idx) => {
+								const StepIcon = step.icon;
+								const isCompleted = reportReady || idx < currentStep;
+								const isActive = !reportReady && idx === currentStep;
+
+								return (
+									<div
+										key={step.id}
+										className={`flex items-center gap-3 p-2 rounded-lg transition-all duration-300 ${
+											isActive
+												? "bg-primary/5 border border-primary/20"
+												: isCompleted
+													? "opacity-80"
+													: "opacity-40"
+										}`}
+									>
+										<div
+											className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
+												isCompleted
+													? "bg-green-500/10 text-green-500"
+													: isActive
+														? "bg-primary/10 text-primary"
+														: "bg-muted text-muted-foreground"
+											}`}
+										>
+											{isCompleted ? (
+												<CheckCircle className="w-4 h-4" />
+											) : isActive ? (
+												<Loader2 className="w-4 h-4 animate-spin" />
+											) : (
+												<StepIcon className="w-4 h-4" />
+											)}
+										</div>
+										<span
+											className={`text-sm font-medium ${
+												isCompleted
+													? "text-green-600 dark:text-green-400"
+													: isActive
+														? "text-foreground"
+														: "text-muted-foreground"
+											}`}
+										>
+											{step.label}
+											{isCompleted && " ✓"}
+										</span>
+									</div>
+								);
+							})}
+						</div>
+					</div>
+
+					{/* Footer Actions */}
+					<div className="flex gap-3 justify-end">
+						{reportReady && reportId ? (
+							<>
+								<Button variant="outline" onClick={handleCloseModal}>
+									Close
+								</Button>
+								<Link href={`/dashboard/reports/${reportId}`}>
+									<Button>
+										<FileText className="w-4 h-4 mr-2" />
+										View Report
+									</Button>
+								</Link>
+							</>
+						) : (
+							<Button variant="outline" onClick={handleCloseModal}>
+								Dismiss
+							</Button>
+						)}
+					</div>
+				</DialogContent>
+			</Dialog>
 		</div>
 	);
 }
+
 
 /* ─── Connect Screen ─── */
 function ConnectScreen({

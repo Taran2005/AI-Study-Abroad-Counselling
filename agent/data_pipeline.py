@@ -43,6 +43,7 @@ def _get_openai() -> AsyncOpenAI:
 # Conversation Lifecycle
 # ============================================================
 
+
 async def create_conversation(room_name: str) -> Optional[str]:
     """
     Register a new conversation in Supabase via the Next.js API.
@@ -105,7 +106,9 @@ async def update_conversation(
                 json=payload,
             )
             resp.raise_for_status()
-            logger.info(f"Updated conversation {conversation_id}: {list(payload.keys())}")
+            logger.info(
+                f"Updated conversation {conversation_id}: {list(payload.keys())}"
+            )
             return True
     except Exception as e:
         logger.error(f"Failed to update conversation {conversation_id}: {e}")
@@ -144,7 +147,11 @@ async def create_lead_score(
 
 async def create_student_profile(extracted_data: dict) -> Optional[str]:
     """Create a student profile from extracted data. Returns profile ID."""
-    if not extracted_data.get("name") and not extracted_data.get("email") and not extracted_data.get("phone"):
+    if (
+        not extracted_data.get("name")
+        and not extracted_data.get("email")
+        and not extracted_data.get("phone")
+    ):
         logger.info("Skipping student profile creation — no identifier available")
         return None
 
@@ -207,7 +214,7 @@ async def extract_student_data(transcript: list[dict]) -> dict:
     if not transcript:
         return {}
 
-    # Format transcript for the LLM  
+    # Format transcript for the LLM
     formatted = "\n".join(
         f"{'Student' if t['role'] == 'user' else 'Counsellor'}: {t['text']}"
         for t in transcript
@@ -228,9 +235,11 @@ async def extract_student_data(transcript: list[dict]) -> dict:
 
         raw = response.choices[0].message.content or "{}"
         data = json.loads(raw)
-        
+
         # Clean up nulls and empty values
-        cleaned = {k: v for k, v in data.items() if v is not None and v != "" and v != []}
+        cleaned = {
+            k: v for k, v in data.items() if v is not None and v != "" and v != []
+        }
         logger.info(f"Extracted {len(cleaned)} data points: {list(cleaned.keys())}")
         return cleaned
 
@@ -295,7 +304,11 @@ async def evaluate_lead_score(transcript: list[dict], extracted_data: dict) -> d
         for t in transcript
     )
 
-    profile_summary = json.dumps(extracted_data, indent=2) if extracted_data else "No profile data extracted"
+    profile_summary = (
+        json.dumps(extracted_data, indent=2)
+        if extracted_data
+        else "No profile data extracted"
+    )
 
     try:
         client = _get_openai()
@@ -386,8 +399,7 @@ async def analyze_sentiment(transcript: list[dict]) -> tuple[list[dict], str]:
         return [], "No student messages found"
 
     formatted = "\n".join(
-        f"Turn {i+1} (Student): {t['text']}"
-        for i, t in enumerate(student_turns)
+        f"Turn {i + 1} (Student): {t['text']}" for i, t in enumerate(student_turns)
     )
 
     try:
@@ -408,7 +420,9 @@ async def analyze_sentiment(transcript: list[dict]) -> tuple[list[dict], str]:
 
         entries = result.get("entries", [])
         summary = result.get("summary", "")
-        logger.info(f"Sentiment analysis: {len(entries)} entries, trend: {result.get('overall_trend', 'unknown')}")
+        logger.info(
+            f"Sentiment analysis: {len(entries)} entries, trend: {result.get('overall_trend', 'unknown')}"
+        )
         return entries, summary
 
     except Exception as e:
@@ -419,6 +433,7 @@ async def analyze_sentiment(transcript: list[dict]) -> tuple[list[dict], str]:
 # ============================================================
 # Full Post-Call Pipeline
 # ============================================================
+
 
 async def run_post_call_pipeline(
     conversation_id: str,
@@ -438,16 +453,23 @@ async def run_post_call_pipeline(
 
     # Calculate duration
     ended_at = datetime.now(timezone.utc)
+    if started_at is None:
+        logger.warning("started_at is None — duration will be 0")
+        started_at = ended_at
     duration_secs = int((ended_at - started_at).total_seconds())
 
     # Run extraction, scoring, and sentiment in parallel
-    extracted_data, score_result, (sentiment_entries, sentiment_summary) = await asyncio.gather(
+    (
+        extracted_data,
+        score_result,
+        (sentiment_entries, sentiment_summary),
+    ) = await asyncio.gather(
         extract_student_data(transcript),
         evaluate_lead_score(transcript, {}),  # Pass empty dict initially
         analyze_sentiment(transcript),
     )
 
-    # Re-evaluate with extracted data for better scoring accuracy  
+    # Re-evaluate with extracted data for better scoring accuracy
     if extracted_data:
         score_result = await evaluate_lead_score(transcript, extracted_data)
 
@@ -498,12 +520,287 @@ async def run_post_call_pipeline(
         except Exception as e:
             logger.error(f"WhatsApp dispatch failed (non-blocking): {e}")
     elif student_phone:
-        logger.info(f"Skipping WhatsApp — lead score {total_score:.0f} is below threshold (40)")
+        logger.info(
+            f"Skipping WhatsApp — lead score {total_score:.0f} is below threshold (40)"
+        )
     else:
         logger.info("Skipping WhatsApp — no phone number extracted")
+
+    # 7. Fire report generation to Next.js server (runs independently of agent)
+    # The LLM call takes 15-30s and LiveKit kills the agent ~20s after disconnect,
+    # so we offload the work to the Next.js server which is NOT tied to LiveKit.
+    try:
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+        print(f"[REPORT] Firing report generation to {api_base}/api/reports/generate")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{api_base}/api/reports/generate",
+                json={
+                    "conversation_id": conversation_id,
+                    "transcript": transcript,
+                    "extracted_data": extracted_data,
+                    "score_result": score_result,
+                    "sentiment_entries": sentiment_entries,
+                },
+            )
+            print(f"[REPORT] Server responded: {resp.status_code} {resp.text[:200]}")
+            if resp.status_code < 300:
+                print(f"[REPORT] ✅ Report generation handed off to server")
+            else:
+                print(f"[REPORT] ❌ Server rejected request: {resp.text}")
+    except Exception as e:
+        print(f"[REPORT] ❌ Failed to trigger server-side report generation: {e}")
+        logger.error(f"Report generation trigger failed: {e}")
+
+    # 8. Fire Slack + Email webhook (runs on the Next.js server)
+    # This triggers the Slack alert for hot leads and sends the Resend study plan email.
+    try:
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+        total_score = (
+            score_result.get("intent_score", 0) * 0.4
+            + score_result.get("financial_score", 0) * 0.3
+            + score_result.get("timeline_score", 0) * 0.3
+        )
+        print(f"[WEBHOOK] Firing call-ended webhook: score={total_score:.0f}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
+                f"{api_base}/api/webhook/call-ended",
+                json={
+                    "conversation_id": conversation_id,
+                    "total_score": total_score,
+                    "extracted_data": extracted_data,
+                    "score_result": score_result,
+                },
+            )
+            print(f"[WEBHOOK] Server responded: {resp.status_code} {resp.text[:200]}")
+    except Exception as e:
+        print(f"[WEBHOOK] ❌ Failed to fire call-ended webhook: {e}")
+        logger.error(f"Call-ended webhook failed: {e}")
 
     logger.info(
         f"Post-call pipeline complete for {conversation_id}. "
         f"Extracted {len(extracted_data)} data points. "
         f"Lead score: I={score_result['intent_score']} F={score_result['financial_score']} T={score_result['timeline_score']}"
     )
+
+
+# ============================================================
+# Report Generation
+# ============================================================
+
+_REPORT_SYSTEM_PROMPT = """You are a report generation engine for an overseas education consultancy.
+Given the student's conversation data, generate a comprehensive post-call report.
+
+Return a single JSON object with these keys:
+
+1. "profile_summary": A formatted summary of the student's profile with these fields:
+   - name, email, phone, location, education_level, field_of_study, institution, gpa
+   - target_countries, course_interest, test_type, test_score, budget_range, scholarship_interest, timeline
+
+2. "university_recommendations": Array of 5-8 universities with:
+   - name, country, city, ranking, course, match_reason
+   - category: "ambitious" | "target" | "safe"
+   - tuition (estimated), requirements, scholarships (array)
+
+3. "gap_analysis": Object with:
+   - strengths: array of current strengths
+   - gaps: array of objects with {category, description, action_items}
+   - overall_readiness: number (0-100)
+
+4. "personalized_timeline": Array of 12-18 month roadmap milestones:
+   - month (number from now), title, description, type, completed (false)
+
+5. "conversation_highlights": Array of key Q&A from the transcript:
+   - topic, question, answer, relevance: "high" | "medium" | "low"
+
+6. "next_steps": Array of action items:
+   - action, priority: "high" | "medium" | "low", deadline (or null), completed (false)
+
+IMPORTANT:
+- For university recommendations, categorize as: Ambitious (top 10% reach), Target (good fit), Safe (backup)
+- For gap analysis, identify what's missing and actionable steps to fix it
+- For timeline, create realistic milestones for the next 12-18 months
+- For conversation highlights, extract the most important questions the student asked
+- Return ONLY valid JSON, no markdown, no explanation."""
+
+
+async def search_universities_for_report(
+    query: str, max_results: int = 8
+) -> list[dict]:
+    """Search universities using the Next.js API."""
+    try:
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+        print(f"[REPORT] Searching universities: query='{query[:80]}', api={api_base}")
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{api_base}/api/universities/search",
+                json={"query": query, "maxResults": max_results},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            unis = data.get("universities", []) or []
+            print(f"[REPORT] Found {len(unis)} universities")
+            return unis
+    except Exception as e:
+        print(f"[REPORT] ⚠ University search failed (non-fatal): {e}")
+        logger.error(f"University search failed for report: {e}")
+        return []
+
+
+async def generate_report_content(
+    transcript: list[dict],
+    extracted_data: dict,
+    score_result: dict,
+    sentiment_entries: list[dict],
+) -> Optional[dict]:
+    """Generate the comprehensive report using LLM."""
+    if not transcript:
+        logger.warning("No transcript available for report generation")
+        return None
+
+    # Build university search query from student profile
+    query_parts = []
+    if extracted_data.get("field_of_study"):
+        query_parts.append(f"studying {extracted_data['field_of_study']}")
+    if extracted_data.get("course_interest"):
+        query_parts.append(f"interested in {extracted_data['course_interest']}")
+    if extracted_data.get("target_countries"):
+        query_parts.append(f"targeting {', '.join(extracted_data['target_countries'])}")
+    if extracted_data.get("budget_range"):
+        query_parts.append(f"budget {extracted_data['budget_range']}")
+
+    university_query = (
+        " ".join(query_parts) if query_parts else "undergraduate programs"
+    )
+    universities = await search_universities_for_report(university_query, max_results=8)
+
+    # Format transcript for LLM
+    formatted_transcript = "\n".join(
+        f"{'Student' if t['role'] == 'user' else 'Counsellor'}: {t['text']}"
+        for t in transcript[:20]  # Limit to first 20 turns for context
+    )
+
+    profile_json = json.dumps(extracted_data, indent=2) if extracted_data else "{}"
+    score_json = json.dumps(score_result, indent=2)
+    sentiment_json = json.dumps(sentiment_entries, indent=2)
+    universities_json = json.dumps(universities, indent=2)
+
+    try:
+        client = _get_openai()
+        print(f"[REPORT] Calling LLM (gpt-4o-mini) for report content...")
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": _REPORT_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": f"""
+PROFILE DATA:
+{profile_json}
+
+LEAD SCORE:
+{score_json}
+
+SENTIMENT ANALYSIS:
+{sentiment_json}
+
+AVAILABLE UNIVERSITIES:
+{universities_json}
+
+CONVERSATION TRANSCRIPT (excerpt):
+{formatted_transcript}
+""",
+                },
+            ],
+            temperature=0.0,
+            response_format={"type": "json_object"},
+            max_tokens=4000,
+        )
+        print(f"[REPORT] LLM response received. Parsing JSON...")
+
+        raw = response.choices[0].message.content or "{}"
+        report_content = json.loads(raw)
+
+        # Add lead score snapshot and sentiment journey
+        report_content["lead_score_snapshot"] = {
+            "intent_score": score_result.get("intent_score", 0),
+            "financial_score": score_result.get("financial_score", 0),
+            "timeline_score": score_result.get("timeline_score", 0),
+            "total_score": score_result.get("intent_score", 0) * 0.4
+            + score_result.get("financial_score", 0) * 0.3
+            + score_result.get("timeline_score", 0) * 0.3,
+            "classification": "hot"
+            if score_result.get("intent_score", 0) * 0.4
+            + score_result.get("financial_score", 0) * 0.3
+            + score_result.get("timeline_score", 0) * 0.3
+            >= 70
+            else "warm"
+            if score_result.get("intent_score", 0) * 0.4
+            + score_result.get("financial_score", 0) * 0.3
+            + score_result.get("timeline_score", 0) * 0.3
+            >= 40
+            else "cold",
+        }
+        report_content["sentiment_journey"] = sentiment_entries
+
+        logger.info(f"Report content generated with {len(report_content)} sections")
+        return report_content
+
+    except Exception as e:
+        print(f"[REPORT] ❌ LLM report generation failed: {e}")
+        import traceback
+        print(f"[REPORT] Traceback:\n{traceback.format_exc()}")
+        logger.error(f"Report content generation failed: {e}")
+        return None
+
+
+async def create_report(conversation_id: str, report_data: dict) -> bool:
+    """Create the report in the database with status=ready in a single call."""
+    try:
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+        print(f"[REPORT] POSTing report to {api_base}/api/reports for conversation {conversation_id}")
+
+        payload = {
+            "conversation_id": conversation_id,
+            "student_name": report_data.get("profile_summary", {}).get("name"),
+            "profile_summary": report_data.get("profile_summary", {}),
+            "university_recommendations": report_data.get(
+                "university_recommendations", []
+            ),
+            "gap_analysis": report_data.get("gap_analysis", {}),
+            "personalized_timeline": report_data.get(
+                "personalized_timeline", []
+            ),
+            "conversation_highlights": report_data.get(
+                "conversation_highlights", []
+            ),
+            "next_steps": report_data.get("next_steps", []),
+            "lead_score_snapshot": report_data.get("lead_score_snapshot", {}),
+            "sentiment_journey": report_data.get("sentiment_journey", []),
+            "status": "ready",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                f"{api_base}/api/reports",
+                json=payload,
+            )
+            print(f"[REPORT] API response status: {resp.status_code}")
+            if resp.status_code >= 400:
+                print(f"[REPORT] ❌ API error body: {resp.text}")
+            resp.raise_for_status()
+            data = resp.json()
+            report_id = data.get("report", {}).get("id")
+
+        print(f"[REPORT] ✅ Report {report_id} created and marked as ready")
+        logger.info(f"Report {report_id} created and marked as ready")
+        return True
+
+    except Exception as e:
+        import traceback
+        print(f"[REPORT] ❌ create_report EXCEPTION: {e}")
+        print(f"[REPORT] Traceback:\n{traceback.format_exc()}")
+        logger.error(f"Failed to create report: {e}")
+        return False
+

@@ -59,88 +59,111 @@ _kb_path = Path(__file__).parent / "knowledge_base.txt"
 _knowledge_base = _kb_path.read_text(encoding="utf-8") if _kb_path.exists() else ""
 
 
-def send_confirmation_email(to_email: str, user_name: str, date: str, time: str):
-    """Sends a beautifully formatted confirmation email to the user via SMTP."""
-    sender_email = os.getenv("SENDER_EMAIL")
-    sender_password = os.getenv("SENDER_PASSWORD")
-
-    if not sender_email or not sender_password:
-        logger.warning("SMTP credentials not configured. Skipping email dispatch.")
-        return
-
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = (
-            "Your StudyBuddyAI AI Overseas Education Consultation is Confirmed!"
-        )
-        msg["From"] = f"StudyBuddyAI Counsellor <{sender_email}>"
-        msg["To"] = to_email
-
-        html_content = f"""
-        <html>
-          <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-            <div style="max-width: 600px; margin: auto; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">
-              <div style="background-color: #0b2240; color: white; padding: 20px; text-align: center;">
-                <h1 style="margin: 0; font-size: 24px;">Booking Confirmed!</h1>
-              </div>
-              <div style="padding: 20px;">
-                <p>Hello {user_name},</p>
-                <p>Thank you for reaching out to StudyBuddyAI. I'm thrilled to confirm your dedicated university admissions consultation.</p>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-                  <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Date:</strong></td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{date}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;"><strong>Time:</strong></td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{time}</td>
-                  </tr>
-                </table>
-                <p style="margin-top: 30px;">An expert overseas education counsellor will join you at the scheduled time to discuss your study abroad plans.</p>
-                <p>Warmest regards,<br><strong>Luna (Virtual Counsellor)</strong><br>StudyBuddyAI</p>
-              </div>
-            </div>
-          </body>
-        </html>
-        """
-        msg.attach(MIMEText(html_content, "html"))
-
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, to_email, msg.as_string())
-
-        logger.info(f"Confirmation email successfully sent to {to_email}")
-    except Exception as e:
-        logger.error(f"Failed to send email to {to_email}: {e}")
-
-
 class LunaAssistant(Agent):
     """Luna AI assistant persona with vision capabilities."""
 
     @llm.function_tool(
-        description="Book a consultation appointment for the user. Call this when the user explicitly agrees to book a time and provides their details."
+        description="Check the counsellor's real-time calendar availability for a given date. Call this when the student wants to book a follow-up consultation and you need to offer them available time slots. Returns a list of available times."
+    )
+    async def check_availability(
+        self,
+        date: str,
+    ):
+        """
+        Check available consultation slots for a given date on the counsellor's live calendar.
+
+        Args:
+            date: The date to check availability for, in YYYY-MM-DD format (e.g. 2026-04-10).
+        """
+        logger.info(f"Checking Cal.com availability for {date}")
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{api_base}/api/calcom",
+                    params={"action": "slots", "date": date},
+                )
+                if resp.status_code >= 400:
+                    logger.error(f"Cal.com slots API error: {resp.text}")
+                    return f"Sorry, I couldn't check the calendar right now. Please try again or visit our booking page directly."
+
+                data = resp.json()
+                slots = data.get("slots", {})
+
+                if not slots or all(len(v) == 0 for v in slots.values()):
+                    return f"There are no available slots on {date}. Would you like to try a different date?"
+
+                # Format slots: show human-readable time BUT include the raw UTC for booking
+                slot_lines = []
+                for day, times in slots.items():
+                    for t in times:
+                        if isinstance(t, dict):
+                            slot_lines.append(f"{t['display']} (bookable_utc={t['utc']})")
+                        else:
+                            slot_lines.append(str(t))
+
+                return (
+                    f"Available consultation times on {date}: {', '.join(slot_lines)}. "
+                    f"Which time works best for you? "
+                    f"IMPORTANT: When the student picks a time, use the exact bookable_utc value as the start_time parameter for book_consultation."
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to check availability: {e}")
+            return "I'm having trouble accessing the calendar. Please try again in a moment."
+
+    @llm.function_tool(
+        description="Book a real consultation appointment on the counsellor's calendar. Call this ONLY after: (1) you checked availability using check_availability, (2) the student chose a specific time slot, and (3) the student provided their name and email."
     )
     async def book_consultation(
         self,
-        user_name: str,
-        user_email: str,
-        date: str,
-        time: str,
+        start_time: str,
+        student_name: str,
+        student_email: str,
     ):
         """
-        Book a consultation appointment for the user.
+        Book a consultation appointment on the counsellor's live calendar.
 
         Args:
-            user_name: The user's full name.
-            user_email: The user's email address.
-            date: The preferred date mapping to a real calendar date (e.g. March 15th).
-            time: The preferred time of the appointment.
+            start_time: The exact bookable_utc value returned by check_availability for the student's chosen slot (e.g. '2026-04-06T04:00:00.000Z'). Do NOT construct this yourself — copy it directly from check_availability output.
+            student_name: The student's full name.
+            student_email: The student's email address for the calendar invite.
         """
-        logger.info(f"Booking consultation for {user_name} on {date} at {time}")
-        await asyncio.to_thread(
-            send_confirmation_email, user_email, user_name, date, time
-        )
-        return "Booking successful! The confirmation email has been sent."
+        logger.info(f"Booking consultation for {student_name} at {start_time}")
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+
+        # Get conversation_id from the agent instance if available
+        agent = _agent_instance
+        conversation_id = getattr(agent, "_conversation_id", None) if agent else None
+
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.post(
+                    f"{api_base}/api/calcom",
+                    json={
+                        "start_time": start_time,
+                        "attendee_name": student_name,
+                        "attendee_email": student_email,
+                        "conversation_id": conversation_id,
+                    },
+                )
+                if resp.status_code >= 400:
+                    error_text = resp.text
+                    logger.error(f"Cal.com booking failed: {error_text}")
+                    return f"I'm sorry, I couldn't complete the booking. The slot may no longer be available. Would you like to try a different time?"
+
+                data = resp.json()
+                booking = data.get("booking", {})
+                booked_time = booking.get("start_time", start_time)
+
+                logger.info(f"Booking confirmed: uid={booking.get('uid')}")
+                return f"Your consultation has been booked successfully! A calendar invite has been sent to {student_email}. Your appointment is on {booked_time}. A counsellor will be ready for you."
+
+        except Exception as e:
+            logger.error(f"Booking request failed: {e}")
+            return "I'm having trouble completing the booking right now. Please try again in a moment."
+
 
     @llm.function_tool(
         description="Search for university recommendations based on the student's profile and preferences. Call this when the student wants to know which universities would be a good fit, or when you have enough profile data to suggest options."
@@ -278,17 +301,83 @@ class LunaAssistant(Agent):
         self._camera_stream = None
         self._screen_stream = None
         self._tasks: list = []
+
+        # Build the full system prompt with embedded knowledge base
+        kb_section = ""
+        if _knowledge_base:
+            kb_section = (
+                "\n\n=== REFERENCE KNOWLEDGE BASE ===\n"
+                "Use this as quick-reference background. For detailed or specific queries, "
+                "ALWAYS use the search_knowledge_base tool to get precise, up-to-date information.\n\n"
+                f"{_knowledge_base}\n"
+                "=== END KNOWLEDGE BASE ===\n"
+            )
+
         super().__init__(
             instructions=(
-                "You are StudyBuddyAI AI, an expert overseas education counsellor. "
-                "Your job is to help students navigate studying abroad, specifically in the UK and Ireland. "
-                "You are friendly, empathetic, and highly knowledgeable about university admissions, IELTS/PTE preparation, "
-                "scholarships, visas, and living costs abroad. "
-                "CONVERSATIONAL PACING (CRITICAL): Always ask ONLY ONE question at a time. Never overwhelm the student with multiple questions in a single response. Wait for their answer before moving to the next topic. "
-                "SMART EXTRACTION: Through natural conversation, aim to gradually collect: Name, Education Level, Target Country, Course Interest, IELTS/PTE Score, and Budget. "
-                "PROACTIVE VISION: If the student mentions their grades, percentage, or IELTS/PTE score, explicitly ask them to hold their marksheet or scorecard up to the camera so you can verify it. Describe what you see when they do! "
-                "CRITICAL INSTRUCTION: If a user asks to search, find, or recommend universities, you MUST immediately call the `search_universities` tool. Do not just list options from memory if they ask for a search.\n"
-                "CRITICAL INSTRUCTION: If a user asks about detailed procedures, visa policies, intricate document details, or anything specific not found in your standard memory, you MUST immediately call the `search_knowledge_base` tool to look it up in the PDF database."
+                "# IDENTITY\n"
+                "You are **StudyBuddyAI AI**, a warm, professional, and highly knowledgeable overseas education counsellor. "
+                "You work for StudyBuddyAI, a consultancy that has helped 45,000+ students get admitted to 120+ partner universities in the UK and Ireland. "
+                "You speak naturally, with empathy and encouragement. You sound like a real human counsellor, not a robot.\n\n"
+
+                "# VOICE & TONE\n"
+                "- Speak in short, clear sentences (you are a VOICE agent — the student is LISTENING, not reading).\n"
+                "- Be warm and encouraging. Use the student's name once you know it.\n"
+                "- Celebrate their achievements ('That's a great GPA!', 'Excellent choice!').\n"
+                "- Never sound judgmental about low scores or tight budgets — always reframe positively.\n"
+                "- Keep responses concise — aim for 2-4 sentences per turn. No essays.\n\n"
+
+                "# SMART QUESTIONNAIRE FLOW\n"
+                "Your goal is to build a complete student profile through natural conversation. "
+                "Follow this sequence, asking ONE question per turn. Skip questions the student already answered.\n\n"
+                "**Phase 1 — Introduction & Basics:**\n"
+                "1. Greet warmly. Ask their name.\n"
+                "2. Ask what country they want to study in (UK, Ireland, or both).\n"
+                "3. Ask whether they're looking at undergraduate or postgraduate.\n\n"
+                "**Phase 2 — Academic Profile:**\n"
+                "4. Ask their current field of study or what they want to study abroad.\n"
+                "5. Ask about their current education (degree, institution, year).\n"
+                "6. Ask about their GPA or percentage. If they mention grades, ask them to show their marksheet to the camera.\n\n"
+                "**Phase 3 — Test Scores & Readiness:**\n"
+                "7. Ask if they've taken IELTS, PTE, or TOEFL. If yes, ask for their score.\n"
+                "8. If they haven't taken a test, encourage them and mention that most UK universities need IELTS 6.0-6.5.\n\n"
+                "**Phase 4 — Preferences & Budget:**\n"
+                "9. Ask about their budget range (tuition + living — give a reference: 'UK typically costs £20,000-£35,000/year for tuition').\n"
+                "10. Ask if they're interested in scholarships.\n"
+                "11. Ask about preferred intake (September or January) and timeline.\n\n"
+                "**Phase 5 — Recommendation & Booking:**\n"
+                "12. Once you have enough data (at least country, level, field, and one of GPA/test score), "
+                "USE the search_knowledge_base tool to find matching universities and give 3-5 personalised recommendations.\n"
+                "13. Ask if they'd like to book a free follow-up consultation with a human counsellor. "
+                "If yes, use check_availability to find real slots and book_consultation to confirm.\n"
+                "14. Ask for their email and phone number for follow-up (needed for WhatsApp summary and email).\n\n"
+
+                "# TOOL USAGE RULES (CRITICAL)\n"
+                "You have access to powerful tools. USE THEM. Do NOT rely on your memory alone.\n\n"
+                "## search_knowledge_base (PRIMARY TOOL)\n"
+                "- Call this tool for ANY question about: universities, courses, fees, scholarships, "
+                "visa requirements, IELTS/PTE requirements, application procedures, living costs, or deadlines.\n"
+                "- Call it BEFORE answering factual questions. The knowledge base has verified, accurate data.\n"
+                "- If the student asks 'Which universities offer Computer Science in UK?', search for it.\n"
+                "- If the student asks 'What IELTS score do I need for Manchester?', search for it.\n"
+                "- If the student asks about visa process or documents, search for it.\n"
+                "- NEVER guess fees, rankings, or requirements. ALWAYS search first.\n\n"
+                "## search_universities\n"
+                "- Use this when you want to do a broad vector-similarity search across the university database.\n"
+                "- Good for: 'find me affordable universities for MBA in UK'.\n"
+                "- If this returns no results, fall back to search_knowledge_base.\n\n"
+                "## check_availability + book_consultation\n"
+                "- When the student wants to book a follow-up, first call check_availability with a date.\n"
+                "- Then call book_consultation with the chosen slot, student name, and email.\n\n"
+
+                "# IMPORTANT RULES\n"
+                "- Ask ONLY ONE question per turn. Wait for the answer.\n"
+                "- If the student gives short answers ('yes', 'no', 'UK'), acknowledge and move to the next question.\n"
+                "- If the student asks something off-topic, gently steer back.\n"
+                "- Always use the search_knowledge_base tool before recommending universities or quoting facts.\n"
+                "- When recommending universities, mention: name, location, key course, approximate tuition, and one scholarship if available.\n"
+                "- Never fabricate university names, fees, or requirements.\n"
+                f"{kb_section}"
             ),
         )
 
@@ -423,14 +512,12 @@ async def studybuddyai_agent(ctx: agents.JobContext):
         turn_handling=TurnHandlingOptions(turn_detection=MultilingualModel()),
     )
 
-    # avatar = anam.AvatarSession(
-    #     persona_config=anam.PersonaConfig(
-    #         name="Luna",
-    #         avatarId=os.environ.get("ANAM_AVATAR_ID", "071b0286-4cce-4808-bee2-e642f1062de3"),
-    #     ),
-    # )
-
-    # await avatar.start(session, room=ctx.room)
+    avatar = anam.AvatarSession(
+        persona_config=anam.PersonaConfig(
+            name=os.environ.get("ANAM_AVATAR_NAME", "Luna"),
+            avatarId=os.environ.get("ANAM_AVATAR_ID", "071b0286-4cce-4808-bee2-e642f1062de3"),
+        ),
+    )
 
     # Start the agent session with the user, using custom text input handler for vision
     _agent_instance = LunaAssistant()
@@ -442,6 +529,9 @@ async def studybuddyai_agent(ctx: agents.JobContext):
             text_input=room_io.TextInputOptions(text_input_cb=vision_text_input_cb),
         ),
     )
+
+    # Start the avatar AFTER the session so it can sync with the TTS output
+    await avatar.start(session, room=ctx.room)
 
     # ── Live Transcript Capture ──
     @session.on("conversation_item_added")
@@ -515,10 +605,12 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     sync_task = asyncio.create_task(_live_sync_loop())
 
     _pipeline_ran = False
+    _pipeline_done = asyncio.Event()
 
     async def _run_close_pipeline():
         nonlocal _pipeline_ran
         if _pipeline_ran:
+            print("[PIPELINE] Already ran — skipping duplicate call")
             return
         _pipeline_ran = True
         sync_task.cancel()
@@ -526,8 +618,12 @@ async def studybuddyai_agent(ctx: agents.JobContext):
         agent = _agent_instance
         conversation_id = getattr(agent, "_conversation_id", None)
 
+        print(f"[PIPELINE] Close pipeline triggered. conversation_id={conversation_id}")
+
         if not conversation_id:
+            print("[PIPELINE] ❌ No conversation ID found — cannot run pipeline")
             logger.warning("No conversation ID found — cannot update status")
+            _pipeline_done.set()
             return
 
         # Always mark as completed first (in case pipeline fails)
@@ -536,8 +632,13 @@ async def studybuddyai_agent(ctx: agents.JobContext):
             status="completed",
             ended_at=datetime.now(timezone.utc).isoformat(),
         )
+        print(f"[PIPELINE] Conversation {conversation_id} marked as completed")
 
-        if agent and getattr(agent, "_transcript", None):
+        transcript = getattr(agent, "_transcript", None)
+        print(f"[PIPELINE] Transcript has {len(transcript) if transcript else 0} messages")
+
+        if agent and transcript:
+            print(f"[PIPELINE] Starting post-call pipeline for {conversation_id}")
             logger.info(
                 f"Session ended — running post-call pipeline for {conversation_id}"
             )
@@ -547,10 +648,18 @@ async def studybuddyai_agent(ctx: agents.JobContext):
                     transcript=agent._transcript,
                     started_at=getattr(agent, "_session_started_at", None),
                 )
+                print(f"[PIPELINE] ✅ Post-call pipeline finished for {conversation_id}")
             except Exception as e:
+                import traceback
+                print(f"[PIPELINE] ❌ Post-call pipeline EXCEPTION: {e}")
+                print(f"[PIPELINE] Traceback:\n{traceback.format_exc()}")
                 logger.error(f"Post-call pipeline failed: {e}")
         else:
+            print("[PIPELINE] ⚠ Empty transcript — skipping pipeline")
             logger.info("Session ended with empty transcript — marked as completed")
+
+        # Signal that the pipeline is done so the job can exit
+        _pipeline_done.set()
 
     # ── Session Close: Primary handler ──
     @session.on("close")
@@ -566,6 +675,13 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     await session.generate_reply(
         instructions="Greet the user warmly and introduce yourself as StudyBuddyAI. Offer your assistance."
     )
+
+    # ── CRITICAL: Keep the job alive until the post-call pipeline finishes ──
+    # Without this, LiveKit kills the job ~20s after disconnect, before the
+    # report LLM call can finish (which takes 15-30s).
+    print("[AGENT] Waiting for session close and pipeline to complete...")
+    await _pipeline_done.wait()
+    print("[AGENT] Pipeline done — job exiting cleanly")
 
 
 if __name__ == "__main__":

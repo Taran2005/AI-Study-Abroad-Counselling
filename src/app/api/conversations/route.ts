@@ -67,6 +67,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const studentId = searchParams.get("student_id");
+    const roomName = searchParams.get("room_name");
     const limit = Number.parseInt(searchParams.get("limit") || "20", 10);
     const offset = Number.parseInt(searchParams.get("offset") || "0", 10);
 
@@ -89,6 +90,9 @@ export async function GET(request: Request) {
     }
     if (studentId) {
       query = query.eq("student_id", studentId);
+    }
+    if (roomName) {
+      query = query.eq("room_name", roomName);
     }
 
     const { data, count, error } = await query;
