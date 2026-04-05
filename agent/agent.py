@@ -649,21 +649,21 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     if _google_creds:
         logger.info("Using Google Cloud STT + TTS (multilingual)")
         agent_stt = google.STT(
-            languages=["hi-IN", "en-US", "mr-IN", "gu-IN", "pa-IN"],
+            languages=["en-IN", "hi-IN", "mr-IN", "gu-IN", "pa-IN"],
             detect_language=True,
             model="latest_long",
             credentials_info=_google_creds,
         )
         agent_tts = google.TTS(
             language="en-US",
-            voice_name="en-US-Chirp3-HD-Charon",
+            voice_name="en-US-Chirp3-HD-Aoede",
             model_name="chirp_3",
             credentials_info=_google_creds,
         )
     else:
         logger.info("Using Deepgram STT + OpenAI TTS (fallback)")
-        agent_stt = deepgram.STT(model="nova-3", language="hi")
-        agent_tts = openai.TTS(voice="alloy")
+        agent_stt = deepgram.STT(model="nova-3", language="en-IN")
+        agent_tts = openai.TTS(voice="nova")
 
     session = AgentSession(
         stt=agent_stt,
