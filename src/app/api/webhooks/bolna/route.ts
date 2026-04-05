@@ -91,7 +91,11 @@ export async function POST(req: NextRequest) {
 	);
 
 	const telephony = payload.telephony_data || {};
-	const extracted = payload.extracted_data || {};
+	
+	// Bolna sometimes nests extracted data inside an `extractions` sub-object
+	const rawExtracted = payload.extracted_data || {};
+	const extracted = (rawExtracted as Record<string, any>).extractions || rawExtracted;
+	
 	const callOutcome = extracted.call_outcome || null;
 	const callSummary = extracted.call_summary || null;
 
@@ -128,8 +132,7 @@ export async function POST(req: NextRequest) {
 				recording_url: telephony.recording_url || null,
 				duration_secs: telephony.duration || 0,
 				ended_at: new Date().toISOString(),
-				student_email:
-					extracted.student_email || undefined,
+				student_email: extracted.student_email || undefined,
 			})
 			.eq("id", existing.id);
 

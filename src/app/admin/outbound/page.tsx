@@ -440,8 +440,10 @@ export default function OutboundCallsPage() {
 																					<span className="text-muted-foreground capitalize min-w-[120px]">
 																						{key.replace(/_/g, " ")}:
 																					</span>
-																					<span className="text-foreground">
-																						{String(value)}
+																					<span className="text-foreground text-sm">
+																						{typeof value === 'object' && value !== null
+																							? JSON.stringify(value, null, 2)
+																							: String(value)}
 																					</span>
 																				</div>
 																			))}

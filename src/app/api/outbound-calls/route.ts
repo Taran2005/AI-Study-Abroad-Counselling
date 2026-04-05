@@ -65,9 +65,30 @@ export async function POST(req: NextRequest) {
 	const callType = body.call_type || "follow_up";
 	const triggeredBy = body.triggered_by || (isSystemCall ? "system" : "admin");
 
-	// Build user_data for Bolna agent prompt injection
+	// Try to hydrate dynamic placeholder variables from student_profiles using the phone number
+	let dbContext: any = {};
+	if (!body.context) {
+		const { data: profile } = await supabase
+			.from("student_profiles")
+			.select("*")
+			.eq("phone", body.phone)
+			.single();
+			
+		if (profile) {
+			dbContext = profile;
+		}
+	}
+
+	// Build user_data for Bolna agent prompt injection with smart fallback defaults
 	const userData: Record<string, unknown> = {
-		student_name: body.student_name || "Student",
+		agent_name: "StudyBuddyAI Follow-Up",
+		student_name: body.student_name || dbContext.name || "Student",
+		target_country: (dbContext.target_countries && dbContext.target_countries[0]) || "your preferred destination",
+		course_interest: dbContext.course_interest || "your chosen field",
+		education_level: dbContext.education_level || "higher education",
+		test_type: dbContext.test_type || "English proficiency test",
+		test_score: dbContext.test_score || "your scores",
+		budget_range: dbContext.budget_range || "your budget",
 		call_type: callType,
 		...(body.context || {}),
 	};
