@@ -369,6 +369,38 @@ class LunaAssistant(Agent):
         logger.info(f"Persona context loaded: {len(context)} chars")
         return context
 
+    @llm.function_tool(
+        description="Transfer the student to a live human counsellor. Call this when the student explicitly asks to speak to a real person, or when you genuinely cannot answer their question and a human would be better suited. After calling this, CONTINUE chatting with the student naturally while they wait."
+    )
+    async def request_human_counsellor(
+        self,
+    ):
+        """
+        Flag this conversation so a human counsellor can join the call.
+        The counsellor will see an alert on their dashboard and can click to join.
+        """
+        conversation_id = getattr(self, "_conversation_id", None)
+        if not conversation_id:
+            return "I'm unable to request a counsellor right now. Let me try to help you instead."
+
+        logger.info(f"Handoff requested for conversation {conversation_id}")
+        api_base = os.getenv("NEXTJS_API_URL", "http://localhost:3000")
+
+        try:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    f"{api_base}/api/conversations/{conversation_id}/handoff",
+                )
+                resp.raise_for_status()
+                logger.info(f"Handoff flagged successfully for {conversation_id}")
+                return (
+                    "A human counsellor has been notified and will join this call shortly. "
+                    "Please continue chatting with me in the meantime — I'm happy to help while you wait!"
+                )
+        except Exception as e:
+            logger.error(f"Failed to request handoff: {e}")
+            return "I'm having trouble reaching a counsellor right now. Let me continue helping you instead."
+
     def __init__(self) -> None:
         self._transcript: list[dict] = []
         self._conversation_id: str | None = None
@@ -463,6 +495,11 @@ class LunaAssistant(Agent):
                 "- SKIP all questionnaire questions that already have answers in the profile.\n"
                 "- Only ask about missing or outdated data points.\n"
                 "- If the student says they are new, skip this tool entirely.\n\n"
+                "## request_human_counsellor\n"
+                "- Call this ONLY when the student explicitly asks to speak with a real human counsellor.\n"
+                "- Also call it if the student seems frustrated and you genuinely cannot help further.\n"
+                "- After calling, CONTINUE chatting with the student naturally while they wait for the counsellor to join.\n"
+                "- Do NOT tell the student to call back or hang up — a counsellor will join THIS call.\n\n"
 
                 "# VISION CAPABILITIES\n"
                 "You have access to the student's camera and screen share when they enable it.\n"
@@ -800,6 +837,23 @@ async def studybuddyai_agent(ctx: agents.JobContext):
     await session.generate_reply(
         instructions="Greet the user warmly and introduce yourself as StudyBuddyAI. Offer your assistance."
     )
+
+    # ── Human Counsellor Handoff Detection ──
+    @ctx.room.on("participant_connected")
+    def _on_participant_connected(participant: rtc.RemoteParticipant):
+        """Detect when a counsellor joins the room and hand off the conversation."""
+        if participant.identity.startswith("counsellor-"):
+            logger.info(f"Counsellor joined: {participant.identity} ({participant.name})")
+            asyncio.create_task(_handover_and_leave(participant))
+
+    async def _handover_and_leave(participant: rtc.RemoteParticipant):
+        """Leave the room immediately once a counsellor joins."""
+        logger.info("Agent departing room instantly after counsellor handoff")
+        
+        # Trigger the close pipeline (marks conversation as completed, runs post-call)
+        await _run_close_pipeline()
+        # Disconnect the agent from the room silently
+        await ctx.room.disconnect()
 
     # ── CRITICAL: Keep the job alive until the post-call pipeline finishes ──
     # Without this, LiveKit kills the job ~20s after disconnect, before the

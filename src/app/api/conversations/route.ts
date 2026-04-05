@@ -74,7 +74,7 @@ export async function GET(request: Request) {
     let query = supabase
       .from("conversations")
       .select(
-        "id, student_id, room_name, started_at, ended_at, duration_secs, status, language, created_at",
+        "id, student_id, room_name, started_at, ended_at, duration_secs, status, language, handoff_requested, created_at",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })

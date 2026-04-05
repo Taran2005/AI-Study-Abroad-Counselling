@@ -8,6 +8,7 @@ import {
 	useConnectionState,
 	useChat,
 	useTranscriptions,
+	useTracks,
 } from "@livekit/components-react";
 import { ConnectionState, Track } from "livekit-client";
 import Link from "next/link";
@@ -475,11 +476,40 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 	// Voice transcriptions hook (agent + user voice transcriptions)
 	const transcriptions = useTranscriptions();
 
+	// Tracks from other participants (e.g. counsellor's camera)
+	const tracks = useTracks(
+		[Track.Source.Camera],
+		{ onlySubscribed: true },
+	);
+
+	// Find the counsellor's camera track
+	const counsellorVideoTrack = useMemo(() => {
+		return tracks.find(
+			(t) =>
+				t.participant.identity.startsWith("counsellor-") &&
+				t.source === Track.Source.Camera,
+		);
+	}, [tracks]);
+
+	const counsellorVideoRef = useRef<HTMLVideoElement>(null);
+
+	// Attach counsellor video track
+	useEffect(() => {
+		if (counsellorVideoTrack?.publication?.track && counsellorVideoRef.current) {
+			const mediaTrack = counsellorVideoTrack.publication.track;
+			mediaTrack.attach(counsellorVideoRef.current);
+			return () => {
+				mediaTrack.detach(counsellorVideoRef.current!);
+			};
+		}
+	}, [counsellorVideoTrack]);
+
 	// Merge chat messages and transcriptions into a unified timeline
 	const allMessages = useMemo(() => {
 		type UnifiedMessage = {
 			id: string;
 			isUser: boolean;
+			senderName: string;
 			text: string;
 			timestamp: number;
 		};
@@ -488,9 +518,15 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 
 		// Add chat messages
 		for (const msg of chatMessages) {
+			const identity = msg.from?.identity || "";
 			messages.push({
 				id: msg.id ?? `chat-${msg.timestamp}`,
-				isUser: msg.from?.identity === room.localParticipant?.identity,
+				isUser: identity === room.localParticipant?.identity,
+				senderName: identity.startsWith("counsellor-")
+					? "Counsellor"
+					: identity === room.localParticipant?.identity
+						? "You"
+						: "AI Agent",
 				text: msg.message,
 				timestamp: msg.timestamp,
 			});
@@ -498,10 +534,16 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 
 		// Add transcriptions
 		for (const tr of transcriptions) {
+			const identity = tr.participantInfo?.identity || "";
 			// Render both final and interim transcriptions for real-time typing effect
 			messages.push({
 				id: tr.streamInfo?.id ?? `tr-${Date.now()}-${Math.random()}`,
-				isUser: tr.participantInfo?.identity === room.localParticipant?.identity,
+				isUser: identity === room.localParticipant?.identity,
+				senderName: identity.startsWith("counsellor-")
+					? "Counsellor"
+					: identity === room.localParticipant?.identity
+						? "You"
+						: "AI Agent",
 				text: tr.text,
 				timestamp: tr.streamInfo?.timestamp ?? Date.now(),
 			});
@@ -605,7 +647,14 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 			{/* Left: Avatar Video */}
 			<div className="flex flex-col flex-1 gap-4">
 				<div className="relative flex-1 flex items-center justify-center rounded-2xl bg-card border border-border overflow-hidden min-h-[300px] sm:min-h-[400px]">
-					{videoTrack ? (
+					{counsellorVideoTrack ? (
+						<video
+							ref={counsellorVideoRef}
+							autoPlay
+							playsInline
+							className="w-full h-full object-cover"
+						/>
+					) : videoTrack ? (
 						<video
 							ref={videoRef}
 							autoPlay
@@ -753,13 +802,15 @@ function AgentRoom({ onDisconnect }: { onDisconnect: () => void }) {
 									}`}
 								>
 									<span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-										{msg.isUser ? "You" : "StudyBuddyAI"}
+										{msg.senderName}
 									</span>
 									<div
 										className={`rounded-xl px-3 py-2 max-w-[85%] text-sm ${
 											msg.isUser
 												? "bg-primary text-primary-foreground"
-												: "bg-secondary text-secondary-foreground"
+												: msg.senderName === "Counsellor"
+													? "bg-chart-4/15 text-foreground border border-chart-4/20"
+													: "bg-secondary text-secondary-foreground"
 										}`}
 									>
 										{msg.text}
