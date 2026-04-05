@@ -647,7 +647,7 @@ async def studybuddyai_agent(ctx: agents.JobContext):
 
     # Build STT and TTS — use Google Cloud if credentials are available, else fallback
     if _google_creds:
-        logger.info("Using Google Cloud STT + TTS (multilingual)")
+        logger.info("Using Google Cloud STT + OpenAI TTS (multilingual STT, female TTS)")
         agent_stt = google.STT(
             languages=["en-IN", "hi-IN", "mr-IN", "gu-IN", "pa-IN"],
             detect_language=True,
