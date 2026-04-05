@@ -623,7 +623,7 @@ async def run_post_call_pipeline(
     if extracted_data:
         await create_student_profile(extracted_data)
 
-    # 4. Send WhatsApp summary to the student (warm/hot leads with phone number)
+    # 4. Send WhatsApp summary to the student (regardless of lead score)
     total_score = (
         score_result["intent_score"] * 0.4
         + score_result["financial_score"] * 0.3
@@ -632,7 +632,7 @@ async def run_post_call_pipeline(
     student_phone = extracted_data.get("phone")
     student_name = extracted_data.get("name", "")
 
-    if student_phone and total_score >= 40:
+    if student_phone:
         try:
             await asyncio.to_thread(
                 send_whatsapp_summary,
@@ -642,12 +642,9 @@ async def run_post_call_pipeline(
                 score_result,
                 conversation_id,
             )
+            logger.info(f"WhatsApp triggered for student {student_name} regardless of score ({total_score:.0f})")
         except Exception as e:
             logger.error(f"WhatsApp dispatch failed (non-blocking): {e}")
-    elif student_phone:
-        logger.info(
-            f"Skipping WhatsApp — lead score {total_score:.0f} is below threshold (40)"
-        )
     else:
         logger.info("Skipping WhatsApp — no phone number extracted")
 

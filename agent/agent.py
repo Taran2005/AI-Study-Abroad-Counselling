@@ -44,7 +44,7 @@ from livekit.agents import (
 )
 from livekit.agents.llm import ImageContent
 from livekit.agents.voice.events import ConversationItemAddedEvent, CloseEvent
-from livekit.plugins import openai, anam, silero, deepgram, elevenlabs, google
+from livekit.plugins import openai, anam, silero, deepgram, elevenlabs, google, noise_cancellation
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 load_dotenv(".env.local")
@@ -473,7 +473,8 @@ class LunaAssistant(Agent):
                 "14. Ask for their email and phone number for follow-up (needed for WhatsApp summary and email).\n\n"
 
                 "# TOOL USAGE RULES (CRITICAL)\n"
-                "You have access to powerful tools. USE THEM. Do NOT rely on your memory alone.\n\n"
+                "You have access to powerful tools. USE THEM. Do NOT rely on your memory alone.\n"
+                "- **TOOL CONFIRMATION:** Before making ANY tool call using user-provided information (especially booking a consultation or looking up a profile), you MUST verbally repeat the information you collected and explicitly ask the user to confirm it is correct. Do NOT execute the tool until the user says yes.\n\n"
                 "## search_knowledge_base (PRIMARY TOOL)\n"
                 "- Call this tool for ANY question about: universities, courses, fees, scholarships, "
                 "visa requirements, IELTS/PTE requirements, application procedures, living costs, or deadlines.\n"

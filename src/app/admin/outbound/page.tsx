@@ -441,8 +441,10 @@ export default function OutboundCallsPage() {
 																						{key.replace(/_/g, " ")}:
 																					</span>
 																					<span className="text-foreground text-sm">
-																						{typeof value === 'object' && value !== null
-																							? JSON.stringify(value, null, 2)
+																						{typeof value === "object" && value !== null
+																							? ("subjective" in value || "objective" in value)
+																								? String((value as any).subjective || (value as any).objective || "—")
+																								: JSON.stringify(value, null, 2)
 																							: String(value)}
 																					</span>
 																				</div>
