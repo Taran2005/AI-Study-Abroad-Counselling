@@ -193,7 +193,7 @@ Score = Intent (40%) + Financial Readiness (30%) + Timeline Urgency (30%)
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/studybuddyai.git
+git clone https://github.com/Taran2005/StudyBuddyAI.git
 cd studybuddyai
 ```
 
@@ -357,32 +357,6 @@ LIVEKIT_API_SECRET=
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
-
----
-
-## 🗺️ Roadmap
-
-### ✅ Completed
-- [x] LiveKit voice agent with GPT-4o + Deepgram + ElevenLabs
-- [x] Anam AI avatar integration
-- [x] RAG pipeline (pgvector knowledge base + retrieval)
-- [x] Supabase schema: all core tables + RLS policies
-- [x] Post-call pipeline (webhook → summary → WhatsApp)
-- [x] Landing page + agent UI
-
-### 🔄 In Progress
-- [ ] Counsellor dashboard (`/dashboard/**`)
-- [ ] Admin panel (`/admin/**`)
-- [ ] Student summary & booking pages
-
-### 📅 Upcoming
-- [ ] **Ghost Counsellor Mode** — AI copilot sidebar for human counsellors during live calls
-- [ ] **Emotional Voice Heatmap** — Color-coded sentiment timeline post-call
-- [ ] **"What If" Simulator** — Adjust IELTS/budget to see new university matches in real time
-- [ ] **n8n Chain Reaction** — One call ending triggers Slack alert, PDF study plan, calendar link, and WhatsApp simultaneously
-- [ ] **Visa Interview Practice Mode** — AI switches to visa officer persona for mock sessions
-- [ ] **Omnichannel Support** — Telegram / Discord / Web chat widget
-- [ ] **Auto-Scraping RAG** — n8n scheduled scrape of university sites → pgvector
 
 ---
 
