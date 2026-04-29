@@ -7,9 +7,9 @@ import { GraduationCap, Menu, X } from "lucide-react";
 
 const navLinks = [
   { label: "Home", href: "/" },
-  { label: "Destinations", href: "#destinations" },
-  { label: "Services", href: "#services" },
-  { label: "Contact", href: "#contact" },
+  { label: "Features", href: "#features" },
+  { label: "How It Works", href: "#how-it-works" },
+  { label: "Tech Stack", href: "#tech-stack" },
 ];
 
 export default function Navbar() {
