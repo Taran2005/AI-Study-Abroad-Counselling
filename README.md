@@ -193,7 +193,7 @@ Score = Intent (40%) + Financial Readiness (30%) + Timeline Urgency (30%)
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Taran2005/StudyBuddyAI.git
+git clone https://github.com/Taran2005/AI-Study-Abroad-Counselling.git
 cd studybuddyai
 ```
 
